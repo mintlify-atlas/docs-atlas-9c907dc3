@@ -1,0 +1,195 @@
+---
+title: Layout Components
+description: Layout primitives for structuring pages and components
+---
+
+Layout components provide the foundation for page structure in AnimeThemes Web.
+
+## Container
+
+A centered container with max-width for page content.
+
+### Usage
+
+```tsx
+import { Container } from "@/components/container/Container";
+
+export default function Page() {
+  return (
+    <Container>
+      <h1>Page Content</h1>
+    </Container>
+  );
+}
+```
+
+### Props
+
+Container extends `div` and accepts all standard HTML div attributes.
+
+### Styling
+
+<ParamField path="margin" type="string" default="0 auto">
+  Centered with auto horizontal margins
+</ParamField>
+
+<ParamField path="padding" type="string" default="24px 16px">
+  Responsive padding
+</ParamField>
+
+<ParamField path="max-width" type="string" default="1100px">
+  Maximum content width
+</ParamField>
+
+## Flex
+
+A flexible container using CSS flexbox.
+
+### Usage
+
+```tsx
+import { Flex } from "@/components/box/Flex";
+
+<Flex 
+  $wrap={true}
+  style={{
+    "--justify-content": "space-between",
+    "--align-items": "center",
+    "--gap": "16px"
+  }}
+>
+  {/* content */}
+</Flex>
+```
+
+### Props
+
+<ParamField path="$wrap" type="boolean">
+  Enable flex-wrap for multi-line layouts
+</ParamField>
+
+<ParamField path="style['--justify-content']" type="Property.JustifyContent">
+  CSS justify-content value
+</ParamField>
+
+<ParamField path="style['--align-items']" type="Property.AlignItems">
+  CSS align-items value
+</ParamField>
+
+<ParamField path="style['--gap']" type="Property.Gap">
+  Gap between flex items
+</ParamField>
+
+## Row
+
+A horizontal flex container (flex-direction: row).
+
+### Usage
+
+```tsx
+import { Row } from "@/components/box/Flex";
+
+<Row style={{ "--gap": "8px", "--align-items": "baseline" }}>
+  <Text>Label:</Text>
+  <Text>Value</Text>
+</Row>
+```
+
+### Example from ThemeDetailCard
+
+From `/src/components/card/ThemeDetailCard.tsx:61`:
+
+```tsx
+<StyledRow>
+  <Text variant="small" color="text">
+    {theme.type}{theme.sequence || null}
+  </Text>
+  <Text>
+    <SongTitle song={theme.song} />
+    <Performances song={theme.song} expandable />
+  </Text>
+  <ThemeMenu theme={theme} />
+</StyledRow>
+```
+
+## Column
+
+A vertical flex container (flex-direction: column).
+
+### Usage
+
+```tsx
+import { Column } from "@/components/box/Flex";
+
+<Column style={{ "--gap": "16px" }}>
+  <Text variant="h1">Title</Text>
+  <Text>Description</Text>
+</Column>
+```
+
+### Example from VideoPlayerBar
+
+From `/src/components/video-player/VideoPlayerBar.tsx:118`:
+
+```tsx
+<Column style={{ "--gap": "8px" }}>
+  <Text color="text-muted" maxLines={1}>
+    <SongTitle song={theme.song} href={videoPagePath} />
+  </Text>
+  {!!theme.song?.performances?.length && (
+    <Text variant="small" color="text-muted" maxLines={1}>
+      <Text>Performed</Text>
+      <Performances song={theme.song} maxPerformances={3} />
+    </Text>
+  )}
+</Column>
+```
+
+## Solid
+
+A container with solid background color from the theme.
+
+### Usage
+
+```tsx
+import { Solid } from "@/components/box/Solid";
+
+<Solid>
+  <Text>Content with solid background</Text>
+</Solid>
+```
+
+### Props
+
+Solid extends `div` and accepts all standard HTML div attributes.
+
+### Styling
+
+<ParamField path="background-color" type="string">
+  Uses `theme.colors["solid"]` from the theme system
+</ParamField>
+
+## Real-World Example
+
+Combining layout components for a complex UI:
+
+```tsx
+import { Container } from "@/components/container/Container";
+import { Column } from "@/components/box/Flex";
+import { Text } from "@/components/text/Text";
+
+export default function AnimePage() {
+  return (
+    <Container>
+      <Column style={{ "--gap": "24px" }}>
+        <Text variant="h1">Anime Title</Text>
+        <Row style={{ "--gap": "16px", "--align-items": "center" }}>
+          <Text variant="small">2024</Text>
+          <Text>•</Text>
+          <Text variant="small">Winter</Text>
+        </Row>
+      </Column>
+    </Container>
+  );
+}
+```

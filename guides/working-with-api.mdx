@@ -1,0 +1,349 @@
+---
+title: Working with the API
+description: Guide to working with the AnimeThemes API and GraphQL layer
+---
+
+This guide explains how to work with the AnimeThemes API through the GraphQL layer in the web project.
+
+## Architecture Overview
+
+The project uses a GraphQL layer that wraps the AnimeThemes REST API:
+
+```
+Next.js App → GraphQL Schema → AnimeThemes REST API
+```
+
+The GraphQL schema is defined in:
+- `src/lib/common/animethemes/type-defs.ts` - Type definitions
+- `src/lib/common/animethemes/resolvers.ts` - Resolvers that fetch from API
+- `src/lib/common/animethemes/api.ts` - API utilities and includes system
+
+## Creating a GraphQL Query
+
+<Steps>
+
+<Step title="Define your query">
+
+Create a GraphQL query using `gql` from `graphql-tag`:
+
+```tsx src/pages/anime/[animeSlug]/index.tsx
+import gql from "graphql-tag";
+
+const { data, apiRequests } = await fetchData<AnimeDetailPageQuery, AnimeDetailPageQueryVariables>(
+    gql`
+        query AnimeDetailPage($animeSlug: String!) {
+            anime(slug: $animeSlug) {
+                slug
+                name
+                season
+                year
+                synopsis
+                themes {
+                    slug
+                    type
+                    sequence
+                }
+            }
+        }
+    `,
+    { animeSlug: params?.animeSlug },
+);
+```
+
+</Step>
+
+<Step title="Use fragments for reusability">
+
+Define fragments on components to keep queries modular:
+
+```tsx src/components/card/ThemeDetailCard.tsx
+import gql from "graphql-tag";
+
+export function ThemeDetailCard({ theme }: Props) {
+    // Component implementation
+}
+
+ThemeDetailCard.fragments = {
+    theme: gql`
+        fragment ThemeDetailCardTheme on Theme {
+            slug
+            type
+            sequence
+            group {
+                slug
+                name
+            }
+            song {
+                title
+            }
+        }
+    `,
+};
+```
+
+Then use the fragment in your query:
+
+```tsx src/pages/anime/[animeSlug]/index.tsx
+import { ThemeDetailCard } from "@/components/card/ThemeDetailCard";
+
+const { data } = await fetchData(
+    gql`
+        ${ThemeDetailCard.fragments.theme}
+        
+        query AnimeDetailPage($animeSlug: String!) {
+            anime(slug: $animeSlug) {
+                slug
+                name
+                themes {
+                    ...ThemeDetailCardTheme
+                }
+            }
+        }
+    `,
+    params,
+);
+```
+
+</Step>
+
+<Step title="Generate TypeScript types">
+
+Run the GraphQL codegen to generate TypeScript types:
+
+```bash
+npm run graphql-codegen
+```
+
+This generates types in `src/generated/graphql.ts` based on your queries.
+
+</Step>
+
+</Steps>
+
+## The Includes System
+
+The AnimeThemes API uses an "includes" system to control which related data is returned. The GraphQL layer automatically manages this.
+
+### How Includes Work
+
+When you query nested fields, the GraphQL layer automatically adds the necessary includes:
+
+```graphql
+query {
+    anime(slug: "bakemonogatari") {
+        name
+        themes {              # Automatically includes "animethemes"
+            type
+            song {            # Automatically includes "animethemes.song"
+                title
+                artists {     # Automatically includes "animethemes.song.artists"
+                    name
+                }
+            }
+        }
+    }
+}
+```
+
+This query results in an API call like:
+```
+/anime/bakemonogatari?include=animethemes,animethemes.song,animethemes.song.artists
+```
+
+### Include Mappings
+
+The includes are defined in `src/lib/common/animethemes/api.ts:17`:
+
+```typescript
+export const INCLUDES = {
+    Anime: {
+        synonyms: "animesynonyms",
+        themes: "animethemes",
+        series: "series",
+        studios: "studios",
+        resources: "resources",
+        images: "images",
+    },
+    Theme: {
+        song: "song",
+        group: "group",
+        anime: "anime",
+        entries: "animethemeentries",
+    },
+    Artist: {
+        performances: "songs",
+        resources: "resources",
+        images: "images",
+        groups: "groups",
+        members: "members",
+    },
+    // ... more mappings
+} as const;
+```
+
+### Allowed Includes
+
+Not all include combinations are allowed by the API. The allowed includes are defined in the `ALLOWED_INCLUDES` object at `src/lib/common/animethemes/api.ts:117`:
+
+```typescript
+const ALLOWED_INCLUDES: Record<string, Array<string>> = {
+    Anime: [
+        "animesynonyms",
+        "series",
+        "animethemes.song.artists",
+        "animethemes.song.artists.images",
+        "animethemes.group",
+        "images",
+        "resources",
+        // ... more allowed includes
+    ],
+    // ... more types
+};
+```
+
+## API Resolvers
+
+Resolvers fetch data from the API and transform it for GraphQL.
+
+### Creating a Simple Resolver
+
+```typescript src/lib/common/animethemes/resolvers.ts
+import { createApiResolver, createApiResolverNotNull } from "./api";
+
+const resolvers = {
+    Query: {
+        anime: createApiResolverNotNull<ApiAnimeIndex>()({
+            endpoint: (parent, { slug }) => `/anime/${slug}`,
+            extractFromResponse: (response) => response.anime,
+            type: "Anime",
+        }),
+        
+        animeAll: createApiResolverPaginated<ApiAnimeIndex>()({
+            endpoint: () => `/anime`,
+            extractFromResponse: (response) => response.anime,
+            type: "Anime",
+        }),
+    },
+};
+```
+
+### Resolver Types
+
+- `createApiResolver` - Returns data or `null` if not found
+- `createApiResolverNotNull` - Throws error if data not found
+- `createApiResolverPaginated` - Fetches all pages automatically
+
+## Real Example: Home Page
+
+Here's how the home page fetches its data:
+
+```tsx src/pages/index.tsx
+import gql from "graphql-tag";
+import type { GetStaticProps } from "next";
+import { FeaturedTheme } from "@/components/featured-theme/FeaturedTheme";
+import type { HomePageQuery } from "@/generated/graphql";
+import { fetchData } from "@/lib/server";
+
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+    const { data, apiRequests } = await fetchData<HomePageQuery>(gql`
+        ${FeaturedTheme.fragments.entry}
+        ${FeaturedTheme.fragments.video}
+
+        query HomePage {
+            featuredTheme {
+                entry {
+                    ...FeaturedThemeEntry
+                }
+                video {
+                    ...FeaturedThemeVideo
+                }
+            }
+            announcementAll {
+                content
+            }
+        }
+    `);
+
+    return {
+        props: {
+            ...getSharedPageProps(apiRequests),
+            featuredTheme: data?.featuredTheme,
+            announcementSources: await Promise.all(
+                data?.announcementAll.map(
+                    async (announcement) => (await serializeMarkdownSafe(announcement.content)).source,
+                ),
+            ),
+        },
+    };
+};
+```
+
+See the full implementation at `src/pages/index.tsx:225`.
+
+## Environment Variables
+
+Configure the API URLs using environment variables:
+
+```bash .env.local
+# Server-side API URL (used during build)
+ANIMETHEMES_API_URL=https://api.animethemes.moe
+
+# Client-side API URL (used in browser)
+NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+
+# Video and audio URLs
+NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+
+# Authentication
+NEXT_PUBLIC_AUTH_PATH=/auth
+AUTH_REFERER=https://animethemes.moe
+```
+
+These are validated in `src/utils/config.ts:28`.
+
+## Caching
+
+The GraphQL layer includes request caching to prevent duplicate API calls during the same request:
+
+```typescript
+export interface ApiResolverContext {
+    cache?: Map<string, unknown | null>;
+    apiRequests: number;
+    req?: IncomingMessage;
+}
+```
+
+Caching is automatic and happens at `src/lib/common/animethemes/api.ts:413`.
+
+## Best Practices
+
+- Use fragments to keep queries modular and reusable
+- Always run `npm run graphql-codegen` after modifying queries
+- Use TypeScript types generated from your queries
+- Keep fragments close to the components that use them
+- Use `getSharedPageProps(apiRequests)` to track API usage
+- Test queries with different include combinations
+- Check the API documentation for available includes
+- Use `createApiResolverNotNull` for required fields
+- Use `createApiResolverPaginated` for lists
+
+## Debugging
+
+Enable verbose logging to see API requests:
+
+```bash
+NEXT_PUBLIC_VERBOSE_LOGS=true npm run dev
+```
+
+This will log:
+- GraphQL query paths
+- Generated API URLs with includes
+- Disallowed includes (if any)
+- Cached requests
+
+## Next Steps
+
+- Learn about [adding pages](/guides/adding-pages)
+- Understand [creating components](/guides/creating-components)
+- Read about [deployment](/guides/deployment)

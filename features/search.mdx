@@ -1,0 +1,416 @@
+---
+title: Search
+description: Global and entity-specific search with filters and relevance ranking
+---
+
+AnimeThemes Web provides powerful search capabilities across all content types. The search system supports full-text queries, entity-specific filtering, and relevance-based ranking.
+
+## Global Search
+
+The main search interface searches across all entity types simultaneously.
+
+<Steps>
+  <Step title="Enter Search Query">
+    Type your search term in the global search box. Results appear for all entity types.
+  </Step>
+  
+  <Step title="Review Results">
+    Results are grouped by entity type:
+    - Anime
+    - Themes
+    - Artists
+    - Series
+    - Studios
+    - Playlists
+  </Step>
+  
+  <Step title="View More">
+    Click "See all results" (↓) button to view full results for that entity type.
+  </Step>
+</Steps>
+
+### Global Search Implementation
+
+```typescript
+// From SearchGlobal.tsx
+export function SearchGlobal({ searchQuery }) {
+  const fetchSearchResults = () =>
+    fetchDataClient<SearchGlobalQuery>(
+      gql`
+        query SearchGlobal($args: SearchArgs!) {
+          search(args: $args) {
+            anime { ...AnimeSummaryCardAnime }
+            themes { ...ThemeSummaryCardTheme }
+            artists { ...ArtistSummaryCardArtist }
+            series { slug name }
+            studios { slug name }
+            playlists { ...PlaylistSummaryCardPlaylist }
+          }
+        }
+      `,
+      { args: { query: searchQuery ?? null } },
+    );
+  
+  const { data } = useQuery({
+    queryKey: ["searchGlobal", searchQuery],
+    queryFn: fetchSearchResults,
+  });
+  
+  const totalResults = 
+    animeResults.length +
+    themeResults.length +
+    artistResults.length +
+    seriesResults.length +
+    studioResults.length +
+    playlistResults.length;
+  
+  if (!totalResults) {
+    return <Text>No results found for query "{searchQuery}"</Text>;
+  }
+}
+```
+
+## Search Results Display
+
+Each entity type shows up to 3 preview results:
+
+### Result Sections
+
+<CardGroup cols={2}>
+  <Card title="Anime" icon="tv">
+    Shows anime cards with cover, title, format, year, and theme count
+  </Card>
+  
+  <Card title="Themes" icon="music">
+    Theme cards with anime, type, song, and artists
+  </Card>
+  
+  <Card title="Artists" icon="microphone">
+    Artist cards with name and theme count
+  </Card>
+  
+  <Card title="Series" icon="list">
+    Simple cards with series name
+  </Card>
+  
+  <Card title="Studios" icon="building">
+    Studio cards with name
+  </Card>
+  
+  <Card title="Playlists" icon="rectangle-list">
+    Playlist cards with name and owner
+  </Card>
+</CardGroup>
+
+### Preview Limitation
+
+```typescript
+function GlobalSearchSection({ results, renderSummaryCard }) {
+  const resultsPreview = results.slice(0, 3);
+  const hasMoreResults = results.length > 3;
+  
+  return (
+    <>
+      <Column>
+        {resultsPreview.map(renderSummaryCard)}
+      </Column>
+      {hasMoreResults && (
+        <Button asChild>
+          <Link href={{ pathname: `/search/${entity}`, query: urlParams }}>
+            <Icon icon={faChevronDown} />
+          </Link>
+        </Button>
+      )}
+    </>
+  );
+}
+```
+
+## Entity-Specific Search
+
+Click through to dedicated search pages for each entity type:
+
+- `/search/anime` - Anime search with filters
+- `/search/theme` - Theme search
+- `/search/artist` - Artist search
+- `/search/series` - Series search
+- `/search/studio` - Studio search
+- `/search/playlist` - Playlist search
+
+### Search Page Structure
+
+```typescript
+// From pages/search/[entity]/index.tsx
+export default function SearchEntityPage({ entity }) {
+  const router = useRouter();
+  const searchQuery = router.query.q;
+  
+  return (
+    <>
+      <SEO title={`${searchQuery ? `${searchQuery} - ` : ""}${capitalize(entity)} Index`} />
+      <Index searchEntity={entity} searchQuery={searchQuery} />
+    </>
+  );
+}
+
+function Index({ searchQuery, searchEntity }) {
+  switch (searchEntity) {
+    case "anime":
+      return <SearchAnime searchQuery={searchQuery} />;
+    case "theme":
+      return <SearchTheme searchQuery={searchQuery} />;
+    // ... other entities
+  }
+}
+```
+
+## Anime Search Filters
+
+The anime search page provides advanced filtering:
+
+### Available Filters
+
+| Filter | Options |
+|--------|--------|
+| **First Letter** | A-Z, 0-9, # (special chars) |
+| **Season** | Winter, Spring, Summer, Fall |
+| **Year** | Any year from database |
+| **Media Format** | TV, Movie, OVA, ONA, Special |
+| **Sort By** | Multiple options (see below) |
+
+### Sorting Options
+
+When searching (query provided):
+- **Relevance** (default) - Best matches first
+- **A → Z** - Alphabetical
+- **Z → A** - Reverse alphabetical
+- **Old → New** - By premiere date
+- **New → Old** - Recent first
+- **Last Added** - Recently added to database
+
+When browsing (no query):
+- Default sort is **A → Z**
+- Relevance not available
+
+```typescript
+// From SearchAnime.tsx
+const initialFilter = {
+  firstLetter: null,
+  season: null,
+  year: null,
+  mediaFormat: null,
+  sortBy: "name",
+};
+
+const { filter, updateFilter } = useFilterStorage(
+  "filter-anime",
+  {
+    ...initialFilter,
+    sortBy: searchQuery ? null : initialFilter.sortBy,
+  }
+);
+```
+
+### Filter Persistence
+
+<Note>
+  Filters are saved to local storage and persist across sessions
+</Note>
+
+Each entity type has its own filter storage key:
+- `filter-anime`
+- `filter-theme`
+- `filter-artist`
+- etc.
+
+## Search Arguments
+
+Searches use structured arguments:
+
+```typescript
+<SearchEntity
+  entity="anime"
+  searchArgs={{
+    query: searchQuery,
+    filters: {
+      "name-like": filter.firstLetter ? `${filter.firstLetter}%` : null,
+      season: filter.season,
+      year: filter.year,
+      media_format: filter.mediaFormat,
+    },
+    sortBy: filter.sortBy,
+  }}
+/>
+```
+
+### Filter Operators
+
+- `name-like` - SQL LIKE pattern matching
+- Exact match for season, year, format
+- Null values ignored (filter not applied)
+
+## Pagination
+
+Search results are paginated:
+
+```typescript
+query SearchAnime($args: SearchArgs!) {
+  searchAnime(args: $args) {
+    data {
+      ...AnimeSummaryCardAnime
+    }
+    nextPage
+  }
+}
+```
+
+- `data` - Current page results
+- `nextPage` - Page number for next results
+- Load more by fetching with increased page number
+
+<Tip>
+  Use the SearchEntity component for consistent pagination handling
+</Tip>
+
+## Search Query Syntax
+
+Search queries support:
+
+- **Plain text**: "cowboy bebop"
+- **Partial matches**: Matches anywhere in title
+- **Case insensitive**: "BEBOP" = "bebop"
+- **Multi-word**: All words must match
+
+<Note>
+  Special search operators (quotes, +, -) are not currently supported
+</Note>
+
+## Filter Components
+
+Reusable filter UI components:
+
+### SearchFilterFirstLetter
+
+Alphabetical filtering:
+```typescript
+<SearchFilterFirstLetter 
+  value={filter.firstLetter} 
+  setValue={bindUpdateFilter("firstLetter")} 
+/>
+```
+
+Provides A-Z buttons, numbers, and special characters.
+
+### SearchFilterSeason
+
+Season dropdown:
+```typescript
+<SearchFilterSeason 
+  value={filter.season} 
+  setValue={bindUpdateFilter("season")} 
+/>
+```
+
+Options: Winter, Spring, Summer, Fall
+
+### SearchFilterYear
+
+Year selection:
+```typescript
+<SearchFilterYear 
+  value={filter.year} 
+  setValue={bindUpdateFilter("year")} 
+/>
+```
+
+Populated from database years.
+
+### SearchFilterMediaFormat
+
+Format dropdown:
+```typescript
+<SearchFilterMediaFormat 
+  value={filter.mediaFormat} 
+  setValue={bindUpdateFilter("mediaFormat")} 
+/>
+```
+
+Options: TV, Movie, OVA, ONA, Special
+
+### SearchFilterSortBy
+
+Sort options:
+```typescript
+<SearchFilterSortBy 
+  value={filter.sortBy} 
+  setValue={bindUpdateFilter("sortBy")}
+>
+  {searchQuery && (
+    <SearchFilterSortBy.Option value={null}>
+      Relevance
+    </SearchFilterSortBy.Option>
+  )}
+  <SearchFilterSortBy.Option value="name">
+    A → Z
+  </SearchFilterSortBy.Option>
+  <SearchFilterSortBy.Option value="-name">
+    Z → A
+  </SearchFilterSortBy.Option>
+</SearchFilterSortBy>
+```
+
+## Theme Search
+
+Theme search includes:
+- Theme type filter (OP/ED)
+- Season/year filters for parent anime
+- Sort by song title, anime name, or date
+
+## Artist Search
+
+Artist search provides:
+- Search by artist name
+- Sort alphabetically
+- View artist theme count
+
+## Playlist Search
+
+Find user-created playlists:
+- Search by playlist name
+- Filter by visibility (if owner)
+- Sort by creation date or name
+- Shows playlist owner
+
+<Tip>
+  Public and unlisted playlists appear in search results for all users
+</Tip>
+
+## Empty Results
+
+When no results found:
+```typescript
+if (!totalResults) {
+  return (
+    <Text block>
+      No results found for query "{searchQuery}". Did you spell it correctly?
+    </Text>
+  );
+}
+```
+
+Suggests checking spelling or trying different terms.
+
+## Search Performance
+
+- Results cached with React Query
+- `keepPreviousData` prevents loading flicker
+- Filters update without full reload
+- Lazy loading for large result sets
+
+```typescript
+const { data, error, isLoading } = useQuery({
+  queryKey: ["searchGlobal", searchQuery],
+  queryFn: fetchSearchResults,
+  placeholderData: keepPreviousData,
+});
+```

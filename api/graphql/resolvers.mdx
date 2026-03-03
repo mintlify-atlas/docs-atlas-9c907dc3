@@ -1,0 +1,547 @@
+---
+title: GraphQL Resolvers
+description: Learn how GraphQL resolvers fetch data from the AnimeThemes API
+---
+
+## Overview
+
+Resolvers are functions that fetch data for GraphQL queries. The AnimeThemes Web application uses a custom resolver system that translates GraphQL queries into REST API calls to the AnimeThemes API.
+
+## Schema Architecture
+
+The GraphQL schema is built from multiple type definition files:
+
+```typescript
+// src/lib/common/animethemes/type-defs.ts
+const typeDefs = gql`
+  type Query {
+    anime(id: Int, slug: String): Anime
+    animeAll(limit: Int, year: Int, season: String): [Anime!]!
+    artist(id: Int, slug: String): Artist
+    // ...
+  }
+  
+  type Anime {
+    id: Int!
+    name: String!
+    slug: String!
+    themes: [Theme!]!
+    // ...
+  }
+`;
+```
+
+Type definitions are located in:
+- `/src/lib/common/animethemes/type-defs.ts` - Main AnimeThemes types
+- `/src/lib/server/animebracket/type-defs.ts` - Anime bracket types
+
+## Resolver Pattern
+
+Resolvers are organized by type and use helper functions to fetch data from the API:
+
+```typescript
+const resolvers: Resolvers = {
+  Query: {
+    anime: createApiResolver<ApiAnimeShow>()({
+      endpoint: (_, { slug }) => `/anime/${slug}`,
+      extractFromResponse: (response) => response.anime,
+    }),
+  },
+  
+  Anime: {
+    themes: createApiResolverNotNull<ApiAnimeShow<"animethemes">>()({
+      extractFromParent: (anime) => anime.animethemes,
+      endpoint: (anime) => `/anime/${anime.slug}`,
+      extractFromResponse: (response) => response.anime.animethemes,
+      type: "Anime",
+      baseInclude: INCLUDES.Anime.themes,
+    }),
+  },
+};
+```
+
+## Resolver Helper Functions
+
+The resolver system provides several helper functions:
+
+### createApiResolver
+
+Creates a resolver that may return null.
+
+```typescript
+createApiResolver<ApiAnimeShow>()({
+  endpoint: (_, { slug }) => `/anime/${slug}`,
+  extractFromResponse: (response) => response.anime,
+})
+```
+
+**Use cases:**
+- Root queries that may not find a resource
+- Optional fields that may be null
+
+### createApiResolverNotNull
+
+Creates a resolver that always returns a value (never null).
+
+```typescript
+createApiResolverNotNull<ApiAnimeShow<"animethemes">>()({
+  extractFromParent: (anime) => anime.animethemes,
+  endpoint: (anime) => `/anime/${anime.slug}`,
+  extractFromResponse: (response) => response.anime.animethemes,
+  type: "Anime",
+  baseInclude: INCLUDES.Anime.themes,
+})
+```
+
+**Use cases:**
+- Required relationships
+- Non-nullable fields
+
+### createApiResolverPaginated
+
+Creates a resolver for paginated list queries.
+
+```typescript
+createApiResolverPaginated<ApiAnimeIndex>()({
+  endpoint: () => `/anime`,
+  extractFromResponse: (response) => response.anime,
+})
+```
+
+**Use cases:**
+- Index pages (animeAll, artistAll, etc.)
+- Large collections of data
+
+### transformedResolver
+
+Wraps a resolver with a transformation function.
+
+```typescript
+transformedResolver(
+  createApiResolverNotNull<ApiAnimeShow<"resources">>()({
+    extractFromParent: (anime) => anime.resources,
+    endpoint: (anime) => `/anime/${anime.slug}`,
+    extractFromResponse: (response) => response.anime.resources,
+    type: "Anime",
+    baseInclude: INCLUDES.Anime.resources,
+  }),
+  (resources) => resources.map(({ animeresource, ...resource }) => 
+    ({ ...animeresource, ...resource })
+  )
+)
+```
+
+**Use cases:**
+- Transforming API response shape
+- Merging pivot table data
+- Adding computed fields
+
+## Include System
+
+The resolver system automatically manages API includes to fetch related data efficiently.
+
+### Include Constants
+
+```typescript
+export const INCLUDES = {
+  Anime: {
+    synonyms: "animesynonyms",
+    themes: "animethemes",
+    series: "series",
+    studios: "studios",
+    resources: "resources",
+    images: "images",
+  },
+  Theme: {
+    song: "song",
+    group: "group",
+    anime: "anime",
+    entries: "animethemeentries",
+  },
+  // ...
+};
+```
+
+### How Includes Work
+
+When you query nested fields, the resolver:
+
+1. Checks if data is already in parent
+2. If not, constructs API request with includes
+3. Fetches data with single API call
+4. Caches result to avoid duplicate requests
+
+**Example:**
+
+```graphql
+query {
+  anime(slug: "bakemonogatari") {
+    name
+    themes {
+      type
+      song {
+        title
+      }
+    }
+  }
+}
+```
+
+Generates API request:
+```
+GET /anime/bakemonogatari?include=animethemes.song
+```
+
+### Nested Includes
+
+The system handles deeply nested includes:
+
+```graphql
+query {
+  anime(slug: "bakemonogatari") {
+    themes {
+      entries {
+        videos {
+          audio {
+            filename
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Generates:
+```
+GET /anime/bakemonogatari?include=animethemes.animethemeentries.videos.audio
+```
+
+## Root Query Resolvers
+
+### Single Resource Queries
+
+```typescript
+Query: {
+  anime: createApiResolver<ApiAnimeShow>()({
+    endpoint: (_, { slug }) => `/anime/${slug}`,
+    extractFromResponse: (response) => response.anime,
+  }),
+  
+  artist: createApiResolver<ApiArtistShow>()({
+    endpoint: (_, { slug }) => `/artist/${slug}`,
+    extractFromResponse: (response) => response.artist,
+  }),
+  
+  theme: createApiResolver<ApiThemeShow>()({
+    endpoint: (_, { id }) => `/animetheme/${id}`,
+    extractFromResponse: (response) => response.animetheme,
+  }),
+}
+```
+
+### List Queries
+
+```typescript
+Query: {
+  animeAll: createApiResolverPaginated<ApiAnimeIndex>()({
+    endpoint: () => `/anime`,
+    extractFromResponse: (response) => response.anime,
+  }),
+  
+  themeAll: createApiResolverPaginated<ApiThemeIndex>()({
+    endpoint: (_, { orderBy, orderDesc, has }) =>
+      `/animetheme?sort=${orderDesc ? "-" : ""}${orderBy}&filter[has]=${has}`,
+    extractFromResponse: (response) => response.animethemes,
+  }),
+}
+```
+
+### Special Queries
+
+```typescript
+Query: {
+  // Constructed from API data
+  year: (_, { value }) => ({ value }),
+  
+  // Nested scope
+  me: () => ({}),
+}
+```
+
+## Type Resolvers
+
+### Field Resolvers
+
+Resolve specific fields on types:
+
+```typescript
+Anime: {
+  // Fetch related themes
+  themes: createApiResolverNotNull<ApiAnimeShow<"animethemes">>()({
+    extractFromParent: (anime) => anime.animethemes,
+    endpoint: (anime) => `/anime/${anime.slug}`,
+    extractFromResponse: (response) => response.anime.animethemes,
+    type: "Anime",
+    baseInclude: INCLUDES.Anime.themes,
+  }),
+  
+  // Fetch images
+  images: createApiResolverNotNull<ApiAnimeShow<"images">>()({
+    extractFromParent: (anime) => anime.images,
+    endpoint: (anime) => `/anime/${anime.slug}`,
+    extractFromResponse: (response) => response.anime.images,
+    type: "Anime",
+    baseInclude: INCLUDES.Anime.images,
+  }),
+}
+```
+
+### Default Values
+
+Provide default values for nullable fields:
+
+```typescript
+Theme: {
+  sequence: (theme) => theme.sequence || 0,
+}
+
+Entry: {
+  version: (entry) => entry.version || 1,
+}
+```
+
+### Enum Resolvers
+
+Map internal values to GraphQL enum values:
+
+```typescript
+VideoOverlap: {
+  NONE: "None",
+  TRANSITION: "Transition",
+  OVER: "Over",
+}
+```
+
+## Data Transformation
+
+Some resolvers transform API responses to match the GraphQL schema:
+
+### Merging Pivot Data
+
+```typescript
+Artist: {
+  performances: transformedResolver(
+    createApiResolverNotNull<ApiArtistShow<"songs">>()({
+      extractFromParent: (artist) => artist.songs,
+      endpoint: (artist) => `/artist/${artist.slug}`,
+      extractFromResponse: (response) => response.artist.songs,
+      type: "Artist",
+      baseInclude: INCLUDES.Artist.performances,
+    }),
+    (songs, artist) => songs.map((song) => 
+      ({ ...song.artistsong, song, artist })
+    )
+  ),
+}
+```
+
+This merges pivot table data (`artistsong`) with the related models.
+
+### Flattening Resources
+
+```typescript
+Anime: {
+  resources: transformedResolver(
+    createApiResolverNotNull<ApiAnimeShow<"resources">>()({
+      extractFromParent: (anime) => anime.resources,
+      endpoint: (anime) => `/anime/${anime.slug}`,
+      extractFromResponse: (response) => response.anime.resources,
+      type: "Anime",
+      baseInclude: INCLUDES.Anime.resources,
+    }),
+    (resources) => resources.map(({ animeresource, ...resource }) => 
+      ({ ...animeresource, ...resource })
+    )
+  ),
+}
+```
+
+## Pagination
+
+Paginated resolvers handle large datasets:
+
+```typescript
+Query: {
+  animeAll: createApiResolverPaginated<ApiAnimeIndex>()({
+    endpoint: () => `/anime`,
+    extractFromResponse: (response) => response.anime,
+  }),
+}
+```
+
+The system:
+1. Respects the `limit` parameter
+2. Uses default page size from config
+3. Fetches pages sequentially
+4. Aggregates results
+
+## Context and Caching
+
+### API Request Context
+
+```typescript
+export interface ApiResolverContext {
+  apiRequests: number;
+  req?: IncomingMessage;
+  // ...
+}
+```
+
+### Request Counting
+
+The context tracks API requests for performance monitoring:
+
+```typescript
+const { data, apiRequests } = await fetchData<Query>(query);
+console.log(`Made ${apiRequests} API requests`);
+```
+
+### Deduplication
+
+The resolver system deduplicates requests within a single query execution using:
+- Parent data checking (`extractFromParent`)
+- Shared include paths
+- Request batching with `p-limit`
+
+## Error Handling
+
+Resolvers handle errors gracefully:
+
+```typescript
+// Nullable resolvers return null on error
+anime: createApiResolver<ApiAnimeShow>()({
+  endpoint: (_, { slug }) => `/anime/${slug}`,
+  extractFromResponse: (response) => response.anime,
+})
+// Returns null if anime not found
+
+// Non-null resolvers throw errors
+themes: createApiResolverNotNull<ApiAnimeShow<"animethemes">>()({
+  // ...
+})
+// Throws error if themes cannot be fetched
+```
+
+## Best Practices
+
+### 1. Use Fragments
+
+Define reusable fragments on components:
+
+```typescript
+MyComponent.fragments = {
+  anime: gql`
+    fragment MyComponentAnime on Anime {
+      id
+      name
+      slug
+    }
+  `,
+};
+```
+
+### 2. Minimize Over-fetching
+
+Only query fields you need:
+
+```graphql
+# Good
+query {
+  anime(slug: $slug) {
+    name
+    year
+  }
+}
+
+# Avoid
+query {
+  anime(slug: $slug) {
+    # All fields
+    id
+    name
+    slug
+    year
+    season
+    synopsis
+    # ...
+  }
+}
+```
+
+### 3. Use Appropriate Resolver Types
+
+- Use `createApiResolver` for nullable fields
+- Use `createApiResolverNotNull` for required fields
+- Use `createApiResolverPaginated` for lists
+- Use `transformedResolver` for data transformation
+
+### 4. Leverage Includes
+
+Let the resolver system handle includes automatically:
+
+```graphql
+# This query automatically includes themes.song.artists
+query {
+  anime(slug: $slug) {
+    themes {
+      song {
+        title
+        performances {
+          artist {
+            name
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Custom Resolvers
+
+Some resolvers use custom logic:
+
+### Bracket Resolvers
+
+```typescript
+// src/lib/server/animebracket/resolvers.ts
+Query: {
+  bracket: async (_, { slug }) => {
+    const bracket = await fetchJson<SourceBracket>(
+      `https://animebracket.com/api/bracket/${slug}`
+    );
+    // Custom transformation
+    return transformBracket(bracket);
+  },
+}
+```
+
+### Season Resolvers
+
+```typescript
+Season: {
+  anime: createApiResolverPaginated<ApiAnimeIndex>()({
+    endpoint: (season) => 
+      `/anime?filter[year]=${season.year.value}&filter[season]=${season.value}`,
+    extractFromResponse: (response) => response.anime,
+    type: "Anime",
+  }),
+}
+```
+
+## Next Steps
+
+- [GraphQL Queries](/api/graphql/queries) - Learn how to write queries
+- [GraphQL Types](/api/graphql/types) - Explore available types
+- [Working with API](/guides/working-with-api) - Guide to using the AnimeThemes API

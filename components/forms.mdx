@@ -1,0 +1,329 @@
+---
+title: Form Components
+description: Form inputs and controls built with Radix UI primitives
+---
+
+Form components provide accessible, styled inputs for user interaction.
+
+## Input
+
+A text input component with icon and reset functionality.
+
+### Usage
+
+```tsx
+import { Input } from "@/components/form/Input";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+
+function SearchForm() {
+  const [query, setQuery] = useState("");
+  
+  return (
+    <Input
+      value={query}
+      onChange={setQuery}
+      icon={faMagnifyingGlass}
+      resettable={true}
+      inputProps={{
+        placeholder: "Search anime...",
+        autoComplete: "off"
+      }}
+    />
+  );
+}
+```
+
+### Props
+
+<ParamField path="value" type="string" required>
+  Current input value
+</ParamField>
+
+<ParamField path="onChange" type="(value: string) => void" required>
+  Callback when value changes
+</ParamField>
+
+<ParamField path="resettable" type="boolean" default="false">
+  Shows reset button (X) when value is not empty
+</ParamField>
+
+<ParamField path="icon" type="IconDefinition">
+  FontAwesome icon to display at the start of input
+</ParamField>
+
+<ParamField path="inputProps" type="ComponentPropsWithRef<'input'>">
+  Additional props passed to the underlying input element
+</ParamField>
+
+### Styling
+
+<ParamField path="padding" type="string" default="0.5rem 1rem">
+  Input padding
+</ParamField>
+
+<ParamField path="border-radius" type="string" default="2rem">
+  Rounded corners for pill shape
+</ParamField>
+
+<ParamField path="background-color" type="string">
+  Uses `theme.colors["solid-on-card"]`
+</ParamField>
+
+### Focus State
+
+From `/src/components/form/Input.tsx:24`:
+
+```tsx
+&:focus-within {
+  box-shadow: ${theme.shadows.low};
+  
+  // Dark theme focus ring
+  box-shadow: 0 0 0 2px ${theme.colors["text-primary"]};
+}
+```
+
+### Source
+
+Defined in `/src/components/form/Input.tsx:52`
+
+## TextArea
+
+A multi-line text input with vertical resizing.
+
+### Usage
+
+```tsx
+import { TextArea } from "@/components/form/TextArea";
+
+function CommentForm() {
+  return (
+    <TextArea
+      placeholder="Enter your comment..."
+      rows={4}
+    />
+  );
+}
+```
+
+### Props
+
+TextArea extends the standard HTML `textarea` element and accepts all standard textarea attributes.
+
+### Styling
+
+<ParamField path="padding" type="string" default="8px 16px">
+  Internal padding
+</ParamField>
+
+<ParamField path="border-radius" type="string" default="8px">
+  Corner radius
+</ParamField>
+
+<ParamField path="resize" type="string" default="vertical">
+  Only allow vertical resizing
+</ParamField>
+
+<ParamField path="background-color" type="string">
+  Uses `theme.colors["solid-on-card"]`
+</ParamField>
+
+<ParamField path="scrollbar-color" type="string">
+  Custom scrollbar colors: `theme.colors["gray-800"]` on transparent
+</ParamField>
+
+### Source
+
+Defined in `/src/components/form/TextArea.tsx:6`
+
+## Switch
+
+A toggle switch built with Radix UI Switch primitive.
+
+### Usage
+
+```tsx
+import Switch from "@/components/form/Switch";
+
+function Settings() {
+  const [enabled, setEnabled] = useState(false);
+  
+  return (
+    <label>
+      <Switch 
+        isChecked={enabled}
+        onCheckedChange={setEnabled}
+      />
+      <span>Enable notifications</span>
+    </label>
+  );
+}
+```
+
+### Props
+
+<ParamField path="isChecked" type="boolean" required>
+  Current checked state
+</ParamField>
+
+<ParamField path="onCheckedChange" type="(isChecked: boolean) => void" required>
+  Callback when checked state changes
+</ParamField>
+
+Also accepts all `RadixSwitch.SwitchProps`.
+
+### Styling
+
+<ParamField path="width" type="string" default="50px">
+  Switch width
+</ParamField>
+
+<ParamField path="height" type="string" default="25px">
+  Switch height
+</ParamField>
+
+<ParamField path="background-color" type="string">
+  Uses `theme.colors["solid-on-card"]` when unchecked
+</ParamField>
+
+### Switch States
+
+From `/src/components/form/Switch.tsx:26`:
+
+```tsx
+const StyledSwitchThumb = styled(RadixSwitch.Thumb)`
+  width: 25px;
+  height: 25px;
+  background-color: ${theme.colors["text-disabled"]};
+  
+  &[data-state="checked"] {
+    transform: translateX(25px);
+    background-color: ${theme.colors["text-primary"]};
+  }
+`;
+```
+
+### Source
+
+Defined in `/src/components/form/Switch.tsx:48`
+
+## Slider
+
+A range slider built with Radix UI Slider primitive.
+
+### Usage
+
+```tsx
+import { Slider } from "@/components/slider/Slider";
+
+function VolumeControl() {
+  const [volume, setVolume] = useState(0.5);
+  
+  return (
+    <Slider
+      value={[volume]}
+      onValueChange={([value]) => setVolume(value)}
+      min={0}
+      max={1}
+      step={0.01}
+    />
+  );
+}
+```
+
+### Props
+
+<ParamField path="value" type="number[]">
+  Current slider value(s)
+</ParamField>
+
+<ParamField path="onValueChange" type="(value: number[]) => void">
+  Callback when value changes
+</ParamField>
+
+<ParamField path="min" type="number">
+  Minimum value
+</ParamField>
+
+<ParamField path="max" type="number">
+  Maximum value
+</ParamField>
+
+<ParamField path="step" type="number">
+  Step increment
+</ParamField>
+
+Also accepts all `RadixSlider.SliderProps`.
+
+### Styling
+
+<ParamField path="width" type="string" default="100px">
+  Slider width
+</ParamField>
+
+<ParamField path="height" type="string" default="20px">
+  Touch target height
+</ParamField>
+
+### Example from VolumeControl
+
+From `/src/components/video-player/VolumeControl.tsx:47`:
+
+```tsx
+<StyledSlider
+  value={[volume]}
+  onValueChange={([volume]) => { 
+    setVolume(volume); 
+    setMuted(false); 
+  }}
+  min={0}
+  max={1}
+  step={0.01}
+/>
+```
+
+### Source
+
+Defined in `/src/components/slider/Slider.tsx:53`
+
+## Form Composition
+
+Combining form components:
+
+```tsx
+import { Column } from "@/components/box/Flex";
+import { Input } from "@/components/form/Input";
+import { TextArea } from "@/components/form/TextArea";
+import Switch from "@/components/form/Switch";
+import { Button } from "@/components/button/Button";
+
+function PlaylistForm() {
+  return (
+    <Column style={{ "--gap": "16px" }}>
+      <Input
+        value={name}
+        onChange={setName}
+        inputProps={{ placeholder: "Playlist name" }}
+      />
+      
+      <TextArea
+        placeholder="Description"
+        rows={3}
+      />
+      
+      <label>
+        <Switch isChecked={isPublic} onCheckedChange={setIsPublic} />
+        Make playlist public
+      </label>
+      
+      <Button variant="primary">Save Playlist</Button>
+    </Column>
+  );
+}
+```
+
+## Accessibility
+
+- All inputs support keyboard navigation
+- Focus states use theme colors
+- Radix UI primitives include ARIA attributes
+- Custom scrollbar styles maintain accessibility

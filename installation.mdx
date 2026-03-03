@@ -1,0 +1,278 @@
+---
+title: Installation
+description: Set up your development environment for AnimeThemes Web
+---
+
+# Installation Guide
+
+This guide will walk you through setting up AnimeThemes Web on your local machine.
+
+## Prerequisites
+
+<Note>
+  Before you begin, ensure you have the following installed on your system.
+</Note>
+
+### Node.js
+
+AnimeThemes Web requires **Node.js 18.0.0 or higher**. The project is tested with Node.js 24.x.
+
+<Tabs>
+  <Tab title="Check Version">
+    ```bash
+    node --version
+    ```
+    
+    This should output `v18.0.0` or higher.
+  </Tab>
+  <Tab title="Install Node.js">
+    Download and install Node.js from the official website:
+    
+    [https://nodejs.org/](https://nodejs.org/)
+    
+    We recommend using the LTS (Long Term Support) version.
+  </Tab>
+  <Tab title="Using nvm">
+    If you use nvm (Node Version Manager):
+    
+    ```bash
+    nvm install 24
+    nvm use 24
+    ```
+  </Tab>
+</Tabs>
+
+### Package Manager
+
+You'll need one of the following package managers:
+
+- **npm** (comes with Node.js)
+- **yarn** (optional)
+- **pnpm** (optional)
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the AnimeThemes Web repository from GitHub:
+    
+    ```bash
+    git clone https://github.com/AnimeThemes/animethemes-web.git
+    cd animethemes-web
+    ```
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Install all required dependencies using your preferred package manager:
+    
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+      
+      ```bash yarn
+      yarn install
+      ```
+      
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+    
+    This will install all dependencies defined in `package.json`, including:
+    
+    - **Next.js 15.3.0** - React framework
+    - **React 19.1.0** - UI library
+    - **TypeScript 5.7.2** - Type safety
+    - **styled-components 6.1.14** - CSS-in-JS styling
+    - **@tanstack/react-query** - Data fetching and caching
+    - **GraphQL** - API query language
+    - **Radix UI** - Accessible components
+    - **Motion** - Animation library
+    - And many more...
+    
+    <Note>
+      The `postinstall` script will automatically run `patch-package` to apply any necessary patches to dependencies.
+    </Note>
+  </Step>
+  
+  <Step title="Configure Environment Variables">
+    Create a `.env.local` file in the root directory to configure environment variables:
+    
+    ```bash
+    touch .env.local
+    ```
+    
+    Add the following minimal configuration:
+    
+    ```ini .env.local
+    # Set this to the URL on which your local API is served
+    ANIMETHEMES_API_URL=http://localhost
+    
+    # Or use the production API (not recommended for development)
+    # NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+    ```
+    
+    <Warning>
+      If you don't have a local instance of animethemes-server set up, you can use the production or beta URLs of the AnimeThemes API. Keep in mind that this puts additional load on the servers, so it's recommended to set up your own API instance locally.
+    </Warning>
+    
+    See the [Configuration](/configuration) page for all available environment variables.
+  </Step>
+  
+  <Step title="Verify Installation">
+    Run the development server to verify everything is set up correctly:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+    
+    <Check>
+      If you see the AnimeThemes homepage, congratulations! Your installation is successful.
+    </Check>
+  </Step>
+</Steps>
+
+## Optional Setup
+
+### Set Up Husky (Git Hooks)
+
+Husky is automatically set up during installation via the `prepare` script. This enables pre-commit hooks for code quality checks.
+
+```bash
+npm run prepare
+```
+
+### Install Recommended VS Code Extensions
+
+For the best development experience, install these VS Code extensions:
+
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **GraphQL** - GraphQL syntax highlighting
+- **styled-components** - CSS-in-JS syntax highlighting
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Installation fails with permission errors">
+    If you encounter permission errors during installation:
+    
+    **On macOS/Linux:**
+    ```bash
+    sudo chown -R $USER:$GROUP ~/.npm
+    sudo chown -R $USER:$GROUP ~/.config
+    ```
+    
+    **On Windows:**
+    Run your terminal as Administrator.
+  </Accordion>
+  
+  <Accordion title="Module not found errors">
+    If you see module resolution errors:
+    
+    1. Delete `node_modules` and lock files:
+       ```bash
+       rm -rf node_modules package-lock.json
+       ```
+    
+    2. Clear npm cache:
+       ```bash
+       npm cache clean --force
+       ```
+    
+    3. Reinstall dependencies:
+       ```bash
+       npm install
+       ```
+  </Accordion>
+  
+  <Accordion title="TypeScript errors">
+    If TypeScript shows errors:
+    
+    1. Run the type checker:
+       ```bash
+       npm run type-check
+       ```
+    
+    2. Delete the `.next` directory:
+       ```bash
+       rm -rf .next
+       ```
+    
+    3. Restart your development server
+  </Accordion>
+  
+  <Accordion title="Port 3000 already in use">
+    If port 3000 is already in use, you can:
+    
+    1. Stop the process using port 3000
+    2. Or run on a different port:
+       ```bash
+       PORT=3001 npm run dev
+       ```
+  </Accordion>
+  
+  <Accordion title="API connection issues">
+    If you can't connect to the API:
+    
+    1. Check your `.env.local` file configuration
+    2. Ensure the API URL is correct
+    3. Verify your local API instance is running (if using local API)
+    4. Check your firewall settings
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration"
+  >
+    Configure environment variables and customize your setup
+  </Card>
+  <Card
+    title="Development"
+    icon="code"
+    href="/development"
+  >
+    Learn about the development workflow and available commands
+  </Card>
+</CardGroup>
+
+## System Requirements
+
+### Minimum Requirements
+
+- **Node.js**: 18.0.0 or higher
+- **RAM**: 2GB minimum
+- **Disk Space**: 500MB for dependencies
+- **OS**: macOS, Linux, or Windows
+
+### Recommended Specifications
+
+- **Node.js**: 24.x LTS
+- **RAM**: 4GB or more
+- **Disk Space**: 1GB or more
+- **CPU**: Multi-core processor for faster builds
+
+## Build Dependencies
+
+AnimeThemes Web includes these key development dependencies:
+
+- **@graphql-codegen** - GraphQL code generation
+- **ESLint** - JavaScript/TypeScript linting
+- **Prettier** - Code formatting
+- **TypeScript** - Static type checking
+- **esbuild** - Fast bundler for config files
+- **ts-node** - TypeScript execution
+- **husky** - Git hooks
+- **patch-package** - Package patching
+
+<Note>
+  All dependencies are automatically installed when you run `npm install`. You don't need to install them separately.
+</Note>

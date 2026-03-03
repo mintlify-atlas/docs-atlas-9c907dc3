@@ -1,0 +1,258 @@
+---
+title: Navigation Components
+description: Navigation and menu components for site navigation
+---
+
+Navigation components provide the primary navigation interface for AnimeThemes Web.
+
+## Navigation
+
+The main site navigation header.
+
+### Usage
+
+```tsx
+import { Navigation } from "@/components/navigation/Navigation";
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Navigation />
+      <main>{children}</main>
+    </>
+  );
+}
+```
+
+### Features
+
+- **Floating Header**: Becomes opaque on scroll
+- **Responsive Layout**: Collapses to icons on mobile
+- **User Profile**: Shows profile image when logged in
+- **Current Season Link**: Dynamic link to current anime season
+- **Modal Closure**: Closes on navigation
+
+### Navigation Links
+
+From `/src/components/navigation/Navigation.tsx:55`:
+
+```tsx
+<StyledNavigationLinks>
+  <IconTextButton
+    asChild
+    icon={faMagnifyingGlass}
+    variant="silent"
+    collapsible
+    style={{ "--gap": "8px" }}
+  >
+    <Link href="/search">Search</Link>
+  </IconTextButton>
+  
+  <ShuffleDialog
+    trigger={
+      <IconTextButton
+        variant="silent"
+        icon={faShuffle}
+        collapsible
+        style={{ "--gap": "8px" }}
+      >
+        Shuffle
+      </IconTextButton>
+    }
+  />
+
+  <IconTextButton 
+    asChild 
+    variant="silent" 
+    icon={faTv} 
+    collapsible 
+    style={{ "--gap": "8px" }}
+  >
+    <Link href={`/year/${currentYear}/${currentSeason}`}>
+      Current Season
+    </Link>
+  </IconTextButton>
+
+  <IconTextButton
+    asChild
+    variant="silent"
+    icon={me.user ? (
+      <StyledProfileImageIcon>
+        <StyledProfileImage user={me.user} />
+      </StyledProfileImageIcon>
+    ) : faUser}
+    title="My Profile"
+    collapsible
+  >
+    <Link href="/profile">My Profile</Link>
+  </IconTextButton>
+</StyledNavigationLinks>
+```
+
+### Floating State
+
+From `/src/components/navigation/Navigation.tsx:29`:
+
+```tsx
+const [isFloating, setFloating] = useState(true);
+
+useEffect(() => {
+  function onScroll() {
+    setFloating(window.scrollY === 0);
+  }
+
+  window.addEventListener("scroll", onScroll);
+  return () => window.removeEventListener("scroll", onScroll);
+}, []);
+
+return (
+  <StyledNavigation $floating={isFloating}>
+    {/* Navigation content */}
+  </StyledNavigation>
+);
+```
+
+### Source
+
+Defined in `/src/components/navigation/Navigation.tsx:21`
+
+## SearchNavigation
+
+Navigation for search entity selection (available in `/src/components/navigation/SearchNavigation.tsx`).
+
+### Features
+
+- Entity type switching (Anime, Artists, Themes, etc.)
+- Active entity highlighting
+- Responsive tabs
+
+## SeasonNavigation
+
+Navigation for browsing anime by season (available in `/src/components/navigation/SeasonNavigation.tsx`).
+
+### Features
+
+- Season selector (Winter, Spring, Summer, Fall)
+- Year navigation
+- Current season indicator
+
+## YearNavigation
+
+Navigation for browsing anime by year (available in `/src/components/navigation/YearNavigation.tsx`).
+
+### Features
+
+- Year list with pagination
+- Quick jump to current year
+- Decade grouping
+
+## Navigation Structure
+
+The navigation system uses Next.js Link components for client-side routing:
+
+```tsx
+import Link from "next/link";
+import { IconTextButton } from "@/components/button/IconTextButton";
+
+<IconTextButton asChild variant="silent">
+  <Link href="/anime">
+    Browse Anime
+  </Link>
+</IconTextButton>
+```
+
+## Responsive Behavior
+
+Navigation items collapse to icon-only on mobile:
+
+```tsx
+// Desktop: [🔍 Search] [🎲 Shuffle] [📺 Current Season]
+// Mobile:  [🔍] [🎲] [📺]
+<IconTextButton icon={faMagnifyingGlass} collapsible>
+  Search
+</IconTextButton>
+```
+
+## Styling
+
+Navigation uses custom styled components (from `/src/components/navigation/Navigation.style`):
+
+```tsx
+export const StyledNavigation = styled.nav<{ $floating: boolean }>`
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  
+  background-color: ${props => 
+    props.$floating 
+      ? "transparent" 
+      : theme.colors["background"]
+  };
+  
+  transition: background-color 250ms;
+`;
+```
+
+## Authentication State
+
+Navigation shows different content based on authentication:
+
+```tsx
+import useAuth from "@/hooks/useAuth";
+
+export function Navigation() {
+  const { me } = useAuth();
+  
+  return (
+    <StyledNavigation>
+      {me.user ? (
+        <ProfileButton user={me.user} />
+      ) : (
+        <LoginButton />
+      )}
+    </StyledNavigation>
+  );
+}
+```
+
+## Integration with Dialogs
+
+Navigation can trigger dialogs:
+
+```tsx
+import { ShuffleDialog } from "@/components/dialog/ShuffleDialog";
+
+<ShuffleDialog
+  trigger={
+    <IconTextButton variant="silent" icon={faShuffle}>
+      Shuffle
+    </IconTextButton>
+  }
+/>
+```
+
+## Current Season Detection
+
+From `/src/components/navigation/Navigation.tsx:24`:
+
+```tsx
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+
+export function Navigation() {
+  const { currentYear, currentSeason } = useCurrentSeason();
+  
+  return (
+    <Link href={`/year/${currentYear}/${currentSeason}`}>
+      Current Season
+    </Link>
+  );
+}
+```
+
+## Accessibility
+
+- Semantic `<nav>` element
+- Keyboard navigation support
+- Focus visible states
+- ARIA labels on icon buttons
+- Skip links for screen readers

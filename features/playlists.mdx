@@ -1,0 +1,340 @@
+---
+title: Playlists
+description: Create and manage custom theme playlists with drag-and-drop ordering
+---
+
+AnimeThemes Web allows authenticated users to create custom playlists of anime themes. Playlists support custom ordering, descriptions, visibility settings, and can be played as continuous watch lists.
+
+## Creating Playlists
+
+<Note>
+  You must be logged in to create and manage playlists
+</Note>
+
+<Steps>
+  <Step title="Open Playlist Dialog">
+    Click the "New" button with plus icon to open the playlist creation dialog.
+  </Step>
+  
+  <Step title="Enter Playlist Details">
+    Provide:
+    - **Title**: Name for your playlist (required)
+    - **Visibility**: Public, Unlisted, or Private
+  </Step>
+  
+  <Step title="Create Playlist">
+    Click "Create Playlist" to save. The playlist is immediately created on the server.
+  </Step>
+</Steps>
+
+### Playlist Creation Code
+
+```typescript
+// From PlaylistAddDialog.tsx
+function PlaylistAddForm({ onSuccess }) {
+  const [title, setTitle] = useState("");
+  const [visibility, setVisibility] = useState("PUBLIC");
+  
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    
+    try {
+      await axios.post("/playlist", {
+        name: title,
+        visibility,
+      });
+      await mutate((key) => [key].flat().includes("/api/me/playlist"));
+    } catch (error) {
+      // Handle error
+    }
+    
+    onSuccess();
+  }
+  
+  return (
+    <form onSubmit={submit}>
+      <Input value={title} onChange={setTitle} />
+      <Listbox value={visibility} onValueChange={setVisibility}>
+        <ListboxOption value="PUBLIC">Public</ListboxOption>
+        <ListboxOption value="UNLISTED">Unlisted</ListboxOption>
+        <ListboxOption value="PRIVATE">Private</ListboxOption>
+      </Listbox>
+      <Button type="submit">Create Playlist</Button>
+    </form>
+  );
+}
+```
+
+## Visibility Settings
+
+<CardGroup cols={3}>
+  <Card title="Public" icon="globe">
+    Visible to everyone, appears in search results
+  </Card>
+  
+  <Card title="Unlisted" icon="link">
+    Only accessible via direct link
+  </Card>
+  
+  <Card title="Private" icon="lock">
+    Only visible to playlist owner
+  </Card>
+</CardGroup>
+
+## Adding Tracks
+
+Add themes to playlists from multiple locations:
+
+### From Video Player
+
+While watching a theme:
+1. Click "Add to Playlist" button in player bar
+2. Select target playlist from dialog
+3. Track is added to end of playlist
+
+### From Theme Cards
+
+On anime detail pages or search results:
+1. Open theme context menu (three dots)
+2. Select "Add to another Playlist"
+3. Choose destination playlist
+
+### Track Addition Dialog
+
+```typescript
+// From PlaylistTrackAddDialog.tsx
+<PlaylistTrackAddDialog
+  video={video}
+  entry={entry}
+  trigger={
+    <IconTextButton icon={faPlus}>
+      Add to Playlist
+    </IconTextButton>
+  }
+/>
+```
+
+## Managing Playlists
+
+Playlist owners can edit, reorder, and delete tracks.
+
+### Playlist Detail Page
+
+At `/playlist/[playlistId]`, owners see:
+- Edit playlist button (name, visibility)
+- Add description button
+- Drag handles on tracks for reordering
+- Remove track option in context menus
+
+### Editing Details
+
+Click the edit button to modify:
+- Playlist name
+- Visibility setting
+- Cannot be edited by non-owners
+
+### Adding Descriptions
+
+Playlists can have descriptions up to 1000 characters:
+
+```typescript
+// From playlist/[playlistId]/index.tsx
+function Description({ playlist, isOwner }) {
+  const [isEditable, setEditable] = useState(false);
+  const [description, setDescription] = useState(playlist.description ?? "");
+  
+  async function submit() {
+    await axios.put(`/playlist/${playlist.id}`, {
+      description,
+    });
+    setEditable(false);
+  }
+  
+  return (
+    <>
+      <TextArea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        maxLength={1000}
+      />
+      <Text variant="small">{description.length} / 1000</Text>
+    </>
+  );
+}
+```
+
+## Reordering Tracks
+
+Drag and drop to customize playlist order:
+
+<Steps>
+  <Step title="Enable Custom Sort">
+    Set sort filter to "Custom" (default when logged in as owner)
+  </Step>
+  
+  <Step title="Drag Tracks">
+    Click and hold the grip icon (≡) on any track, then drag to new position
+  </Step>
+  
+  <Step title="Auto-save">
+    Order is saved to server automatically on drag end
+  </Step>
+</Steps>
+
+### Linked List Implementation
+
+Playlist tracks use a linked list structure:
+
+```typescript
+type LinkedList<T> = Array<{
+  id: string;
+  previous?: { id: string } | null;
+  next?: { id: string } | null;
+} & T>;
+
+function sortLinkedList<T>(list: LinkedList<T>) {
+  const lookUp = list.reduce((prev, curr) => {
+    prev[curr.id] = curr;
+    return prev;
+  }, {});
+  
+  let next = list.find((item) => !item.previous);
+  const sortedList = [];
+  
+  while (next) {
+    delete lookUp[next.id];
+    sortedList.push(next);
+    next = next.next ? lookUp[next.next.id] : undefined;
+  }
+  
+  return sortedList;
+}
+```
+
+<Note>
+  The linked list structure allows efficient reordering without updating all tracks
+</Note>
+
+## Playlist Playback
+
+Playlists integrate with the video player:
+
+### Play All
+
+Click any track to:
+1. Load entire playlist into watch list
+2. Start playing from selected track
+3. Auto-advance through remaining tracks
+
+### Shuffle All
+
+Click "Shuffle All" button to:
+1. Randomize playlist order
+2. Navigate to first shuffled track
+3. Begin playback
+
+```typescript
+const shuffleAll = useCallback(() => {
+  if (tracksSorted.length === 0) return;
+  
+  const watchList = shuffle(
+    tracksSorted.map((track) => createWatchListItem(track.video, track.entry))
+  );
+  
+  setWatchList(watchList, true);
+  setCurrentWatchListItem(watchList[0]);
+  
+  const { video, entry } = watchList[0];
+  const theme = entry.theme;
+  const anime = theme?.anime;
+  
+  if (anime && entry && video) {
+    const videoSlug = createVideoSlug(theme, entry, video);
+    router.push(`/anime/${anime.slug}/${videoSlug}`);
+  }
+}, [router, tracksSorted]);
+```
+
+## Sorting Options
+
+Playlists can be sorted by:
+
+- **Custom**: Your drag-and-drop order (owner only)
+- **Reversed**: Reverse custom order
+- **A → Z (Song)**: Alphabetical by song title
+- **Z → A (Song)**: Reverse alphabetical by song
+- **A → Z (Anime)**: Alphabetical by anime name
+- **Z → A (Anime)**: Reverse alphabetical by anime
+- **Old → New**: By anime premiere date
+- **New → Old**: Reverse premiere date
+
+<Tip>
+  Sorting doesn't affect the saved playlist order, only the display
+</Tip>
+
+## Ranking Playlists
+
+Playlists with names starting with `[#]` are treated as rankings:
+
+- Show rank numbers on tracks (#1, #2, etc.)
+- Display trophy icon for #1
+- Feature top-ranked track prominently
+- Rank badges positioned on card corner
+
+```typescript
+const isRanking = playlist.name.startsWith("[#] ");
+
+{isRanking && (
+  <StyledRank>
+    {track.rank === 1 ? (
+      <Icon icon={faTrophy} color="gold" />
+    ) : (
+      `#${track.rank}`
+    )}
+  </StyledRank>
+)}
+```
+
+## Track Context Menu
+
+Right-click or click menu button (⋮) on tracks for:
+
+- **Add to another Playlist**: Copy to different playlist
+- **Add to Watch List**: Append to current watch list
+- **Play Next**: Insert after current track
+- **Remove from Playlist**: Delete track (owner only)
+
+## Server-Side Playlists
+
+Playlists are stored on the server:
+
+- Accessible across devices
+- Require authentication
+- Support collaborative viewing (public/unlisted)
+- Persist indefinitely
+
+<Note>
+  Unlike local watch lists, playlists are permanently saved to your account
+</Note>
+
+## Finding Playlists
+
+Discover playlists through:
+
+- **Global Search**: Search for playlist names
+- **User Profiles**: View playlists created by users
+- **Your Profile**: `/profile/playlist` shows your playlists
+- **Direct Links**: Share unlisted playlist URLs
+
+## Playlist Limitations
+
+- Must be logged in to create/edit
+- No limit on number of playlists
+- No limit on tracks per playlist
+- Description limited to 1000 characters
+- Playlist names can be any length
+- Cannot add same video/entry combination twice
+
+<Tip>
+  Use descriptive playlist names to make them easy to find later
+</Tip>

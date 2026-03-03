@@ -1,0 +1,278 @@
+---
+title: useLocalPlaylist
+description: Hook for managing a local playlist stored in browser localStorage
+---
+
+Manages a local playlist of anime themes with persistent storage, allowing users to add, remove, and modify their personal playlist.
+
+## Import
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+```
+
+## Type Definitions
+
+```typescript
+import type { FetchThemeSummaryCardData } from "@/components/card/ThemeSummaryCard";
+
+interface LocalPlaylistTheme {
+    id: number;
+}
+
+type LocalPlaylist = Array<NonNullable<FetchThemeSummaryCardData> & LocalPlaylistTheme>;
+```
+
+## Usage
+
+```typescript
+const {
+    localPlaylist,
+    addToPlaylist,
+    removeFromPlaylist,
+    isInPlaylist,
+    setPlaylist,
+} = useLocalPlaylist();
+```
+
+## Return Value
+
+<ResponseField name="localPlaylist" type="LocalPlaylist">
+  Array of theme objects currently in the playlist. Each theme includes full data from `ThemeSummaryCard` plus an `id` field.
+</ResponseField>
+
+<ResponseField name="addToPlaylist" type="(theme: LocalPlaylistTheme) => void">
+  Adds a theme to the playlist. Fetches fresh theme data and displays a toast notification upon successful addition.
+</ResponseField>
+
+<ResponseField name="removeFromPlaylist" type="(theme: LocalPlaylistTheme) => void">
+  Removes a theme from the playlist by ID.
+</ResponseField>
+
+<ResponseField name="isInPlaylist" type="(theme: LocalPlaylistTheme) => boolean">
+  Checks if a theme is currently in the playlist.
+</ResponseField>
+
+<ResponseField name="setPlaylist" type="(playlist: LocalPlaylist) => void">
+  Replaces the entire playlist with a new array of themes.
+</ResponseField>
+
+## Examples
+
+### Add to Playlist Button
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function AddToPlaylistButton({ theme }: { theme: { id: number } }) {
+    const { addToPlaylist, isInPlaylist, removeFromPlaylist } = useLocalPlaylist();
+    const inPlaylist = isInPlaylist(theme);
+
+    return (
+        <button
+            onClick={() => {
+                if (inPlaylist) {
+                    removeFromPlaylist(theme);
+                } else {
+                    addToPlaylist(theme);
+                }
+            }}
+        >
+            {inPlaylist ? "Remove from Playlist" : "Add to Playlist"}
+        </button>
+    );
+}
+```
+
+### Display Playlist
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function PlaylistPage() {
+    const { localPlaylist, removeFromPlaylist } = useLocalPlaylist();
+
+    if (localPlaylist.length === 0) {
+        return <div>Your playlist is empty</div>;
+    }
+
+    return (
+        <div>
+            <h1>My Playlist ({localPlaylist.length} themes)</h1>
+            <ul>
+                {localPlaylist.map((theme) => (
+                    <li key={theme.id}>
+                        <span>{theme.anime?.name} - {theme.song?.title}</span>
+                        <button onClick={() => removeFromPlaylist(theme)}>
+                            Remove
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+```
+
+### Playlist with Sorting
+
+```typescript
+import { useState } from "react";
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+const UNSORTED = "unsorted";
+const SONG_A_Z = "song-a-z";
+const SONG_Z_A = "song-z-a";
+
+function PlaylistWithSort() {
+    const { localPlaylist, setPlaylist } = useLocalPlaylist();
+    const [sortBy, setSortBy] = useState(UNSORTED);
+
+    const sortedPlaylist = [...localPlaylist].sort((a, b) => {
+        if (sortBy === SONG_A_Z) {
+            return (a.song?.title ?? "").localeCompare(b.song?.title ?? "");
+        }
+        if (sortBy === SONG_Z_A) {
+            return (b.song?.title ?? "").localeCompare(a.song?.title ?? "");
+        }
+        return 0;
+    });
+
+    const handleSort = (newSortBy: string) => {
+        setSortBy(newSortBy);
+        if (newSortBy !== UNSORTED) {
+            // Permanently save sorted order
+            setPlaylist(sortedPlaylist);
+        }
+    };
+
+    return (
+        <div>
+            <select value={sortBy} onChange={(e) => handleSort(e.target.value)}>
+                <option value={UNSORTED}>Original Order</option>
+                <option value={SONG_A_Z}>Song Title (A-Z)</option>
+                <option value={SONG_Z_A}>Song Title (Z-A)</option>
+            </select>
+            <ul>
+                {sortedPlaylist.map((theme) => (
+                    <li key={theme.id}>
+                        {theme.song?.title}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+```
+
+### Playlist Counter Badge
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function PlaylistBadge() {
+    const { localPlaylist } = useLocalPlaylist();
+
+    return (
+        <a href="/profile/playlist">
+            Playlist
+            {localPlaylist.length > 0 && (
+                <span className="badge">{localPlaylist.length}</span>
+            )}
+        </a>
+    );
+}
+```
+
+### Check Multiple Themes
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function ThemeGrid({ themes }: { themes: Array<{ id: number }> }) {
+    const { isInPlaylist, addToPlaylist } = useLocalPlaylist();
+
+    return (
+        <div className="grid">
+            {themes.map((theme) => (
+                <div key={theme.id} className="theme-card">
+                    <h3>{theme.id}</h3>
+                    <button
+                        onClick={() => addToPlaylist(theme)}
+                        disabled={isInPlaylist(theme)}
+                    >
+                        {isInPlaylist(theme) ? "In Playlist" : "Add"}
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+}
+```
+
+### Clear Playlist
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function ClearPlaylistButton() {
+    const { setPlaylist, localPlaylist } = useLocalPlaylist();
+
+    const handleClear = () => {
+        if (confirm(`Clear all ${localPlaylist.length} items from playlist?`)) {
+            setPlaylist([]);
+        }
+    };
+
+    return (
+        <button onClick={handleClear} disabled={localPlaylist.length === 0}>
+            Clear Playlist
+        </button>
+    );
+}
+```
+
+### Export Playlist IDs
+
+```typescript
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function ExportPlaylist() {
+    const { localPlaylist } = useLocalPlaylist();
+
+    const exportToJSON = () => {
+        const ids = localPlaylist.map((theme) => theme.id);
+        const json = JSON.stringify(ids, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "playlist.json";
+        a.click();
+    };
+
+    return (
+        <button onClick={exportToJSON} disabled={localPlaylist.length === 0}>
+            Export Playlist
+        </button>
+    );
+}
+```
+
+## Implementation Details
+
+- Stores playlist in localStorage under the key `"local-playlist"`
+- When adding a theme, fetches fresh data via `fetchThemeSummaryCardData()`
+- Displays toast notification on successful add using `PlaylistAddToast`
+- Merges provided theme data with freshly fetched data to ensure accuracy
+- Prevents duplicate themes in the playlist
+- Source: `/home/daytona/workspace/source/src/hooks/useLocalPlaylist.tsx:14`
+
+## Toast Notifications
+
+The hook automatically displays toast notifications when themes are added to the playlist. The toast includes:
+- Theme information
+- Visual feedback
+- Auto-dismiss functionality
+
+This is handled internally via the `useToasts` context and `PlaylistAddToast` component.

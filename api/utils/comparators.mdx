@@ -1,0 +1,434 @@
+---
+title: Comparators
+description: Type-safe comparator functions for sorting anime, themes, and songs
+---
+
+The `comparators` module provides a comprehensive set of comparator functions for sorting various entities in the AnimeThemes Web application, including anime, themes, songs, and resources.
+
+## Import
+
+```typescript
+import {
+  // Utility functions
+  either,
+  reverse,
+  getComparator,
+  sortTransformed,
+  
+  // Anime comparators
+  animeNameComparator,
+  animeYearComparator,
+  animeSeasonComparator,
+  animePremiereComparator,
+  
+  // Theme comparators
+  themeTypeComparator,
+  themeIndexComparator,
+  themeGroupComparator,
+  
+  // Song comparators
+  songTitleComparator,
+  
+  // Other comparators
+  entryVersionComparator,
+  studioNameComparator,
+  seriesNameComparator,
+  resourceSiteComparator,
+  resourceAsComparator,
+  
+  // Sort constants
+  UNSORTED,
+  ANIME_A_Z,
+  ANIME_Z_A,
+  ANIME_OLD_NEW,
+  ANIME_NEW_OLD,
+  SONG_A_Z,
+  SONG_Z_A,
+  SONG_A_Z_ANIME,
+  SONG_Z_A_ANIME,
+  SONG_OLD_NEW,
+  SONG_NEW_OLD,
+} from "@/utils/comparators";
+```
+
+## Type Definitions
+
+```typescript
+type Comparator<T> = (a: T, b: T) => number;
+
+interface ComparatorChain<T> {
+  chain: () => Comparator<T>;
+  or: <K>(or: Comparator<K>) => ComparatorChain<T & K>;
+}
+```
+
+## Utility Functions
+
+### `either`
+
+```typescript
+function either<T>(comparator: Comparator<T>): ComparatorChain<T>
+```
+
+Creates a comparator chain that allows fallback sorting when the primary comparator returns equal (0).
+
+**Parameters:**
+- `comparator` - The primary comparator function
+
+**Returns:**
+- `ComparatorChain<T>` - A chainable comparator object with `or()` and `chain()` methods
+
+**Usage Example:**
+
+```typescript
+import { either, animeYearComparator, animeSeasonComparator, animeNameComparator } from "@/utils/comparators";
+
+// Sort by year, then by season, then by name
+const comparator = either(animeYearComparator)
+  .or(animeSeasonComparator)
+  .or(animeNameComparator)
+  .chain();
+
+const sorted = anime.sort(comparator);
+```
+
+### `reverse`
+
+```typescript
+function reverse<T>(comparator: Comparator<T>): Comparator<T>
+```
+
+Reverses the sort order of a comparator.
+
+**Parameters:**
+- `comparator` - The comparator to reverse
+
+**Returns:**
+- `Comparator<T>` - A reversed comparator
+
+**Usage Example:**
+
+```typescript
+import { reverse, animeNameComparator } from "@/utils/comparators";
+
+// Sort Z to A instead of A to Z
+const sortedDescending = anime.sort(reverse(animeNameComparator));
+```
+
+### `getComparator`
+
+```typescript
+function getComparator<T extends keyof typeof comparators>(
+  name: T
+): (typeof comparators)[T]
+```
+
+Retrieves a predefined comparator by name.
+
+**Parameters:**
+- `name` - One of the comparator constant names (e.g., `ANIME_A_Z`, `SONG_OLD_NEW`)
+
+**Returns:**
+- The corresponding comparator function
+
+**Usage Example:**
+
+```typescript
+// src/pages/series/[seriesSlug]/index.tsx
+import { ANIME_A_Z, getComparator } from "@/utils/comparators";
+
+const [sortBy, setSortBy] = useState<string>(ANIME_A_Z);
+const animeSorted = useMemo(
+  () => [...anime].sort(getComparator(sortBy)),
+  [anime, sortBy]
+);
+```
+
+### `sortTransformed`
+
+```typescript
+function sortTransformed<T, K>(
+  comparator: Comparator<T>,
+  transformator: (from: K) => T
+): Comparator<K>
+```
+
+Creates a comparator that transforms values before comparing them.
+
+**Parameters:**
+- `comparator` - The comparator to use on transformed values
+- `transformator` - Function to extract/transform the value to compare
+
+**Returns:**
+- `Comparator<K>` - A comparator for the original type
+
+**Usage Example:**
+
+```typescript
+// src/pages/playlist/[playlistId]/index.tsx
+import { getComparator, sortTransformed, ANIME_A_Z } from "@/utils/comparators";
+
+const comparators = {
+  [ANIME_A_Z]: sortTransformed(
+    getComparator(ANIME_A_Z),
+    (track) => track.entry.theme?.anime
+  ),
+};
+
+const sorted = tracks.sort(comparators[ANIME_A_Z]);
+```
+
+## Anime Comparators
+
+### `animeNameComparator`
+
+```typescript
+const animeNameComparator: Comparator<{ name: string }>
+```
+
+Compares anime by name (A-Z).
+
+**Usage Example:**
+
+```typescript
+import { animeNameComparator } from "@/utils/comparators";
+
+const sorted = anime.sort(animeNameComparator);
+```
+
+### `animeYearComparator`
+
+```typescript
+const animeYearComparator: Comparator<{ year: number | null }>
+```
+
+Compares anime by year.
+
+### `animeSeasonComparator`
+
+```typescript
+const animeSeasonComparator: Comparator<{ season: string | null }>
+```
+
+Compares anime by season. Uses the order: Winter → Spring → Summer → Fall.
+
+### `animePremiereComparator`
+
+```typescript
+const animePremiereComparator: Comparator<{ year: number | null, season: string | null }>
+```
+
+Compares anime by premiere date (year first, then season).
+
+**Usage Example:**
+
+```typescript
+import { animePremiereComparator } from "@/utils/comparators";
+
+// Sort by premiere: 2020 Winter, 2020 Spring, 2021 Winter, etc.
+const sorted = anime.sort(animePremiereComparator);
+```
+
+## Theme Comparators
+
+### `themeTypeComparator`
+
+```typescript
+const themeTypeComparator: Comparator<{ type: string }>
+```
+
+Compares themes by type. Uses the order: OP (openings) → ED (endings).
+
+**Usage Example:**
+
+```typescript
+// src/components/table/ThemeTable.tsx
+import { either, themeTypeComparator, themeIndexComparator } from "@/utils/comparators";
+
+const sorted = themes.sort(
+  either(themeTypeComparator).or(themeIndexComparator).chain()
+);
+// Result: OP1, OP2, ED1, ED2
+```
+
+### `themeIndexComparator`
+
+```typescript
+const themeIndexComparator: Comparator<{ sequence: number | null }>
+```
+
+Compares themes by sequence number (OP1, OP2, etc.).
+
+### `themeGroupComparator`
+
+```typescript
+const themeGroupComparator: Comparator<{ group: { name: string } | null }>
+```
+
+Compares themes by group name.
+
+**Usage Example:**
+
+```typescript
+// src/components/filter/AnimeThemeFilter.tsx
+import {
+  either,
+  themeGroupComparator,
+  themeTypeComparator,
+  themeIndexComparator
+} from "@/utils/comparators";
+
+const sorted = themes.sort(
+  either(themeGroupComparator)
+    .or(themeTypeComparator)
+    .or(themeIndexComparator)
+    .chain()
+);
+```
+
+## Song Comparators
+
+### `songTitleComparator`
+
+```typescript
+const songTitleComparator: Comparator<{ song: { title: string | null } | null }>
+```
+
+Compares themes by song title.
+
+## Other Comparators
+
+### `entryVersionComparator`
+
+```typescript
+const entryVersionComparator: Comparator<{ version: number | null }>
+```
+
+Compares entries by version number.
+
+### `studioNameComparator`
+
+```typescript
+const studioNameComparator: Comparator<{ name: string }>
+```
+
+Compares studios by name.
+
+### `seriesNameComparator`
+
+```typescript
+const seriesNameComparator: Comparator<{ name: string }>
+```
+
+Compares series by name.
+
+### `resourceSiteComparator`
+
+```typescript
+const resourceSiteComparator: Comparator<{ site: string | null }>
+```
+
+Compares resources by site name.
+
+### `resourceAsComparator`
+
+```typescript
+const resourceAsComparator: Comparator<{ as: string | null }>
+```
+
+Compares resources by the "as" field.
+
+**Usage Example:**
+
+```typescript
+// src/pages/anime/[animeSlug]/index.tsx
+import { either, resourceSiteComparator, resourceAsComparator } from "@/utils/comparators";
+
+const sortedResources = resources.sort(
+  either(resourceSiteComparator).or(resourceAsComparator).chain()
+);
+```
+
+## Sort Constants
+
+Predefined sort mode identifiers for use with `getComparator()`:
+
+### Anime Sort Modes
+
+```typescript
+const UNSORTED = "unsorted"
+const ANIME_A_Z = "anime-a-z"
+const ANIME_Z_A = "anime-z-a"
+const ANIME_OLD_NEW = "anime-old-new"
+const ANIME_NEW_OLD = "anime-new-old"
+```
+
+### Song Sort Modes
+
+```typescript
+const SONG_A_Z = "song-a-z"
+const SONG_Z_A = "song-z-a"
+const SONG_A_Z_ANIME = "song-a-z-anime"
+const SONG_Z_A_ANIME = "song-z-a-anime"
+const SONG_OLD_NEW = "song-old-new"
+const SONG_NEW_OLD = "song-new-old"
+```
+
+**Usage Example:**
+
+```typescript
+import { ANIME_A_Z, ANIME_Z_A, ANIME_OLD_NEW, ANIME_NEW_OLD } from "@/utils/comparators";
+
+const sortOptions = [
+  { value: ANIME_A_Z, label: "A-Z" },
+  { value: ANIME_Z_A, label: "Z-A" },
+  { value: ANIME_OLD_NEW, label: "Old-New" },
+  { value: ANIME_NEW_OLD, label: "New-Old" },
+];
+```
+
+## Advanced Examples
+
+### Complex Theme Sorting
+
+```typescript
+// src/pages/_app.tsx
+import {
+  either,
+  sortTransformed,
+  themeTypeComparator,
+  themeIndexComparator
+} from "@/utils/comparators";
+
+const sortedThemes = values.sort(
+  sortTransformed(
+    either(themeTypeComparator).or(themeIndexComparator).chain(),
+    (value) => value.theme
+  )
+);
+// Sorts by theme type (OP/ED), then by index, extracting theme from value
+```
+
+### Playlist Track Sorting
+
+```typescript
+// src/pages/playlist/[playlistId]/index.tsx
+import { getComparator, sortTransformed, SONG_A_Z, ANIME_OLD_NEW } from "@/utils/comparators";
+
+const customComparators = {
+  [SONG_A_Z]: sortTransformed(
+    getComparator(SONG_A_Z),
+    (track) => track.entry.theme
+  ),
+  [ANIME_OLD_NEW]: sortTransformed(
+    getComparator(ANIME_OLD_NEW),
+    (track) => track.entry.theme?.anime
+  ),
+};
+
+const sorted = tracks.sort(customComparators[sortMode]);
+```
+
+## See Also
+
+- [GraphQL Types](/api/graphql/types) - Type definitions for anime, themes, and more

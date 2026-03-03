@@ -1,0 +1,180 @@
+---
+title: useCurrentSeason
+description: Hook for retrieving the current anime season and year
+---
+
+Provides the current anime season (winter, spring, summer, fall) and year, with proper server-side rendering and client-side hydration support.
+
+## Import
+
+```typescript
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+```
+
+## Type Definitions
+
+```typescript
+interface CurrentSeason {
+    currentYear: number;
+    currentSeason: "winter" | "spring" | "summer" | "fall";
+}
+```
+
+## Usage
+
+```typescript
+const { currentYear, currentSeason } = useCurrentSeason();
+```
+
+## Return Value
+
+<ResponseField name="currentYear" type="number">
+  The current year (e.g., 2024)
+</ResponseField>
+
+<ResponseField name="currentSeason" type="'winter' | 'spring' | 'summer' | 'fall'">
+  The current anime season based on the current month:
+  - `"winter"`: January, February, March (months 0-2)
+  - `"spring"`: April, May, June (months 3-5)
+  - `"summer"`: July, August, September (months 6-8)
+  - `"fall"`: October, November, December (months 9-11)
+</ResponseField>
+
+## Examples
+
+### Display Current Season
+
+```typescript
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+
+function CurrentSeasonBanner() {
+    const { currentYear, currentSeason } = useCurrentSeason();
+
+    return (
+        <div>
+            <h1>{currentSeason.charAt(0).toUpperCase() + currentSeason.slice(1)} {currentYear}</h1>
+            <p>Browse anime from the current season</p>
+        </div>
+    );
+}
+```
+
+### Navigation to Current Season
+
+```typescript
+import Link from "next/link";
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+
+function SeasonNavigation() {
+    const { currentYear, currentSeason } = useCurrentSeason();
+
+    return (
+        <nav>
+            <Link href={`/year/${currentYear}/${currentSeason}`}>
+                Current Season
+            </Link>
+        </nav>
+    );
+}
+```
+
+### Homepage Integration
+
+```typescript
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+import useAuth from "@/hooks/useAuth";
+
+export default function HomePage() {
+    const { me } = useAuth();
+    const { currentYear, currentSeason } = useCurrentSeason();
+
+    return (
+        <div>
+            <h1>Welcome to AnimeThemes</h1>
+            <section>
+                <h2>{currentSeason} {currentYear} Anime</h2>
+                <p>Discover the latest anime themes from this season</p>
+                <a href={`/year/${currentYear}/${currentSeason}`}>
+                    View {currentSeason} anime
+                </a>
+            </section>
+        </div>
+    );
+}
+```
+
+### Conditional Rendering Based on Season
+
+```typescript
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+
+function SeasonalPromotion() {
+    const { currentSeason } = useCurrentSeason();
+
+    const getSeasonalMessage = () => {
+        switch (currentSeason) {
+            case "winter":
+                return "Cozy up with winter anime!";
+            case "spring":
+                return "Spring into new series!";
+            case "summer":
+                return "Hot summer anime lineup!";
+            case "fall":
+                return "Fall for these new shows!";
+        }
+    };
+
+    return (
+        <div className={`promotion-${currentSeason}`}>
+            <p>{getSeasonalMessage()}</p>
+        </div>
+    );
+}
+```
+
+### Building Season Links
+
+```typescript
+import useCurrentSeason from "@/hooks/useCurrentSeason";
+
+function SeasonSelector() {
+    const { currentYear, currentSeason } = useCurrentSeason();
+    const seasons = ["winter", "spring", "summer", "fall"] as const;
+
+    return (
+        <div>
+            <h3>Seasons</h3>
+            <ul>
+                {seasons.map((season) => (
+                    <li key={season}>
+                        <a 
+                            href={`/year/${currentYear}/${season}`}
+                            className={season === currentSeason ? "active" : ""}
+                        >
+                            {season}
+                        </a>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+```
+
+## Implementation Details
+
+- Calculates season based on JavaScript's `Date.getMonth()` (0-indexed)
+- Uses `useState` with initializer function for server-side rendering
+- Hydrates with current date on client-side mount via `useEffect`
+- Prevents hydration mismatches between server and client
+- Month-to-season mapping follows standard anime season conventions
+- Source: `/home/daytona/workspace/source/src/hooks/useCurrentSeason.ts:8`
+
+## Season Mapping
+
+| Months | Season |
+|--------|--------|
+| January - March | Winter |
+| April - June | Spring |
+| July - September | Summer |
+| October - December | Fall |

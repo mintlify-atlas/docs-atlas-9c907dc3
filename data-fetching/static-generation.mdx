@@ -1,0 +1,300 @@
+---
+title: Static Site Generation
+description: How AnimeThemes Web uses Next.js SSG with getStaticProps and getStaticPaths
+---
+
+AnimeThemes Web uses Next.js Static Site Generation (SSG) to pre-render pages at build time for optimal performance. The site uses ISR (Incremental Static Regeneration) to keep content fresh.
+
+## getStaticProps
+
+The `getStaticProps` function fetches data at build time and passes it as props to the page component.
+
+### Basic Example
+
+```tsx
+import type { GetStaticProps } from "next";
+import { fetchData } from "@/lib/server";
+import getSharedPageProps from "@/utils/getSharedPageProps";
+
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+  const { data, apiRequests } = await fetchData<HomePageQuery>(gql`
+    query HomePage {
+      featuredTheme {
+        entry {
+          id
+        }
+        video {
+          id
+        }
+      }
+      announcementAll {
+        content
+      }
+    }
+  `);
+
+  return {
+    props: {
+      ...getSharedPageProps(apiRequests),
+      featuredTheme: data?.featuredTheme,
+      announcementSources: await Promise.all(
+        data?.announcementAll.map(
+          async (announcement) => (await serializeMarkdownSafe(announcement.content)).source,
+        ),
+      ),
+    },
+  };
+};
+```
+
+Reference: `src/pages/index.tsx:225-256`
+
+### With Parameters
+
+For dynamic routes, parameters are available in the context:
+
+```tsx
+interface AnimeDetailPageParams extends ParsedUrlQuery {
+  animeSlug: string;
+}
+
+export const getStaticProps: GetStaticProps<AnimeDetailPageProps, AnimeDetailPageParams> = async ({ params }) => {
+  let data = params ? buildTimeCache.get(params.animeSlug) : null;
+  let apiRequests = 0;
+
+  if (!data) {
+    ({ data, apiRequests } = await fetchData<AnimeDetailPageQuery, AnimeDetailPageQueryVariables>(
+      gql`
+        ${AnimeDetailPage.fragments.anime}
+
+        query AnimeDetailPage($animeSlug: String!) {
+          anime(slug: $animeSlug) {
+            ...AnimeDetailPageAnime
+          }
+        }
+      `,
+      params,
+    ));
+  }
+
+  if (!data.anime) {
+    return {
+      notFound: true,
+    };
+  }
+
+  return {
+    props: {
+      ...getSharedPageProps(apiRequests),
+      anime: data.anime,
+      synopsisMarkdownSource: data.anime.synopsis
+        ? (await serializeMarkdownSafe(data.anime.synopsis)).source
+        : null,
+    },
+    // Revalidate after 1 hour (= 3600 seconds).
+    revalidate: 3600,
+  };
+};
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:191-227`
+
+## Incremental Static Regeneration
+
+Pages include a `revalidate` property to enable ISR:
+
+```tsx
+return {
+  props: {
+    // ... props
+  },
+  revalidate: 3600, // Revalidate after 1 hour (3600 seconds)
+};
+```
+
+This means:
+- Pages are generated at build time
+- After 1 hour, the next request triggers a background regeneration
+- Stale content is served while regeneration happens
+- New content is available for subsequent requests
+
+## getStaticPaths
+
+For dynamic routes, `getStaticPaths` specifies which paths to pre-render at build time.
+
+### Basic Implementation
+
+```tsx
+import type { GetStaticPaths } from "next";
+import fetchStaticPaths from "@/utils/fetchStaticPaths";
+
+interface AnimeDetailPageParams extends ParsedUrlQuery {
+  animeSlug: string;
+}
+
+export const getStaticPaths: GetStaticPaths<AnimeDetailPageParams> = () => {
+  return fetchStaticPaths(async () => {
+    const { data } = await fetchData<AnimeDetailPageAllQuery>(gql`
+      ${AnimeDetailPage.fragments.anime}
+
+      query AnimeDetailPageAll {
+        animeAll {
+          ...AnimeDetailPageAnime
+        }
+      }
+    `);
+
+    data.animeAll.forEach((anime) => buildTimeCache.set(anime.slug, { anime }));
+
+    return data.animeAll.map((anime) => ({
+      params: {
+        animeSlug: anime.slug,
+      },
+    }));
+  });
+};
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:229-249`
+
+### Build-Time Caching
+
+Notice the `buildTimeCache` pattern:
+
+```tsx
+const buildTimeCache: Map<string, AnimeDetailPageQuery> = new Map();
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:189`
+
+This cache is populated during `getStaticPaths` and reused in `getStaticProps` to avoid redundant API calls:
+
+```tsx
+let data = params ? buildTimeCache.get(params.animeSlug) : null;
+let apiRequests = 0;
+
+if (!data) {
+  // Fetch from API
+}
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:192-193`
+
+## MINIMAL_BUILD Mode
+
+The project supports a minimal build mode for faster development builds.
+
+### The fetchStaticPaths Helper
+
+```typescript
+import { MINIMAL_BUILD } from "@/utils/config";
+
+export default async function fetchStaticPaths<T extends ParsedUrlQuery = ParsedUrlQuery>(
+  fetchPaths: () => Promise<Array<{ params: T }>>,
+  forceFullBuild = false,
+): Promise<{ paths: Array<{ params: T }>; fallback: "blocking" }> {
+  // In development all pages should be fetched on-demand.
+  // This speeds up page generation a lot.
+  // This can also be enabled via an environment variable.
+  if (process.env.NODE_ENV === "development" || (MINIMAL_BUILD && !forceFullBuild)) {
+    return {
+      paths: [],
+      fallback: "blocking",
+    };
+  }
+
+  const paths = await fetchPaths();
+
+  return {
+    paths,
+    fallback: "blocking",
+  };
+}
+```
+
+Reference: `src/utils/fetchStaticPaths.ts:1-25`
+
+### How It Works
+
+- **Development mode**: Returns empty paths array, all pages generated on-demand
+- **MINIMAL_BUILD=true**: Same behavior as development
+- **Production build**: Pre-generates all paths
+- **Fallback**: Always set to `"blocking"` for on-demand generation of missing paths
+
+### Enabling MINIMAL_BUILD
+
+Set the environment variable:
+
+```bash
+MINIMAL_BUILD=true npm run build
+```
+
+Reference: `src/utils/config.ts:10`
+
+## staticPageGenerationTimeout
+
+The Next.js config includes an extended timeout for static page generation:
+
+```typescript
+const nextConfig: NextConfig = {
+  staticPageGenerationTimeout: 3600, // 1 hour
+  experimental: {
+    // We don't want to multi-thread page building
+    // to make use of caching between page builds.
+    workerThreads: false,
+    cpus: 1,
+  },
+};
+```
+
+Reference: `next.config.ts:25-31`
+
+### Why These Settings?
+
+- **staticPageGenerationTimeout**: Extended to 3600 seconds (1 hour) to handle large builds
+- **workerThreads: false**: Disables multi-threading to preserve build-time cache between pages
+- **cpus: 1**: Single-threaded builds ensure the `buildTimeCache` works correctly
+
+## Shared Page Props
+
+All pages include shared props for tracking and debugging:
+
+```tsx
+import getSharedPageProps from "@/utils/getSharedPageProps";
+
+return {
+  props: {
+    ...getSharedPageProps(apiRequests),
+    // ... other props
+  },
+};
+```
+
+This includes:
+- `lastBuildAt`: Timestamp of when the page was built
+- `apiRequests`: Number of API requests made during build
+
+These are displayed in development via the `PageRevalidation` component.
+
+## Handling 404s
+
+When data doesn't exist, return `notFound`:
+
+```tsx
+if (!data.anime) {
+  return {
+    notFound: true,
+  };
+}
+```
+
+This triggers Next.js's 404 page instead of rendering the page with null data.
+
+## Best Practices
+
+1. **Use build-time caching** to avoid redundant API calls between `getStaticPaths` and `getStaticProps`
+2. **Set appropriate revalidate times** (3600 seconds = 1 hour is the standard)
+3. **Always use fallback: "blocking"** to handle new content after build
+4. **Handle missing data** by returning `notFound: true`
+5. **Use MINIMAL_BUILD** for faster development iterations
+6. **Single-threaded builds** ensure cache consistency across page generation

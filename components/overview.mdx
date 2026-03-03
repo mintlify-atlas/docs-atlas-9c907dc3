@@ -1,0 +1,87 @@
+---
+title: Components Overview
+description: An overview of the AnimeThemes Web component library
+---
+
+AnimeThemes Web is built with a comprehensive set of reusable React components using TypeScript, styled-components, and Radix UI primitives.
+
+## Component Categories
+
+<CardGroup cols={2}>
+  <Card title="Layout Components" icon="grid" href="/components/layout">
+    Container, Flex, Row, Column, and Solid components for page structure
+  </Card>
+  
+  <Card title="Cards" icon="square" href="/components/cards">
+    Card, SummaryCard, ThemeDetailCard, and specialized card components
+  </Card>
+  
+  <Card title="Buttons" icon="hand-pointer" href="/components/buttons">
+    Button, IconTextButton, and specialized button variants
+  </Card>
+  
+  <Card title="Forms" icon="input-text" href="/components/forms">
+    Input, TextArea, Switch, and Slider components with Radix UI integration
+  </Card>
+  
+  <Card title="Video Player" icon="play" href="/components/video-player">
+    VideoPlayer with controls, overlay, and volume management
+  </Card>
+  
+  <Card title="Navigation" icon="bars" href="/components/navigation">
+    Navigation, search navigation, and season/year navigation
+  </Card>
+</CardGroup>
+
+## Architecture
+
+All components are built with:
+
+- **TypeScript** for type safety
+- **styled-components** for styling with CSS-in-JS
+- **Radix UI** primitives for accessible UI components
+- **FontAwesome** icons for consistent iconography
+
+## Component Organization
+
+Components are organized in `/src/components/` by feature:
+
+```
+src/components/
+├── box/          # Layout primitives (Flex, Row, Column, Solid)
+├── button/       # Button components and variants
+├── card/         # Card components
+├── container/    # Container wrapper
+├── form/         # Form inputs and controls
+├── navigation/   # Navigation components
+├── video-player/ # Video player components
+├── text/         # Text and typography components
+└── ...
+```
+
+## Styling System
+
+Components use CSS custom properties for theming:
+
+```tsx
+<Row style={{ "--gap": "16px", "--align-items": "center" }}>
+  {/* content */}
+</Row>
+```
+
+## GraphQL Integration
+
+Many components include GraphQL fragments for data fetching:
+
+```tsx
+ThemeDetailCard.fragments = {
+  theme: gql`
+    fragment ThemeDetailCardTheme on Theme {
+      type
+      sequence
+      song { title }
+      // ...
+    }
+  `
+}
+```

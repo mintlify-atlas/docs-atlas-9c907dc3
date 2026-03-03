@@ -1,0 +1,442 @@
+---
+title: Authentication
+description: User authentication with login, registration, and password reset
+---
+
+AnimeThemes Web uses Laravel Sanctum for secure cookie-based authentication. Users can register accounts, log in, and access authenticated features like playlist management.
+
+## Authentication Flow
+
+The authentication system follows this flow:
+
+<Steps>
+  <Step title="CSRF Protection">
+    Request CSRF token from `/sanctum/csrf-cookie` before authentication
+  </Step>
+  
+  <Step title="Submit Credentials">
+    Send login/registration request with credentials
+  </Step>
+  
+  <Step title="Session Cookie">
+    Receive secure session cookie on success
+  </Step>
+  
+  <Step title="Authenticated Requests">
+    Include cookie in subsequent API requests
+  </Step>
+</Steps>
+
+## User Registration
+
+New users can create accounts with:
+
+- Name (display name)
+- Email address
+- Password (with confirmation)
+- Terms of service acceptance
+
+### Registration Dialog
+
+```typescript
+// Registration flow (similar to login)
+async function register({ setErrors, ...props }) {
+  await csrf(); // Get CSRF token
+  
+  setErrors({});
+  
+  axios
+    .post(`${AUTH_PATH}/register`, props)
+    .then(() => mutateGlobal(() => true))
+    .catch((error) => {
+      if (error.response.status !== 422) {
+        throw error;
+      }
+      setErrors(error.response.data.errors);
+    });
+}
+```
+
+### Registration Errors
+
+Validation errors returned for:
+- Invalid email format
+- Email already registered
+- Weak password
+- Terms not accepted
+
+```typescript
+export interface RegisterErrors {
+  name?: Array<string>;
+  email?: Array<string>;
+  password?: Array<string>;
+}
+```
+
+<Note>
+  All registration errors are displayed inline below the relevant form field
+</Note>
+
+## User Login
+
+Existing users authenticate with email and password.
+
+### Login Dialog Implementation
+
+```typescript
+// From LoginDialog.tsx
+export function LoginDialog() {
+  const [open, setOpen] = useState(false);
+  
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>Login</Button>
+      </DialogTrigger>
+      <DialogContent title="Login">
+        {open ? <LoginForm onCancel={() => setOpen(false)} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### Login Form
+
+```typescript
+function LoginForm({ onCancel }) {
+  const { login } = useAuth();
+  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isRemember, setRemember] = useState(false);
+  
+  function performLogin(event) {
+    event.preventDefault();
+    setBusy(true);
+    
+    login({
+      setErrors,
+      email,
+      password,
+      remember: isRemember,
+    }).finally(() => setBusy(false));
+  }
+  
+  return (
+    <form onSubmit={performLogin}>
+      <Input
+        value={email}
+        onChange={setEmail}
+        inputProps={{ type: "email", required: true }}
+      />
+      <Input
+        value={password}
+        onChange={setPassword}
+        inputProps={{ type: "password", required: true }}
+      />
+      <Switch
+        id="input-remember"
+        isChecked={isRemember}
+        onCheckedChange={setRemember}
+      />
+      <Button type="submit">Login</Button>
+    </form>
+  );
+}
+```
+
+### Remember Me
+
+Optional "Remember my login on this device" checkbox:
+- Extends session duration
+- Keeps user logged in across browser restarts
+- Can be disabled for shared computers
+
+<Tip>
+  Disable "Remember Me" on public or shared computers
+</Tip>
+
+## useAuth Hook
+
+Central authentication hook provides all auth functions:
+
+```typescript
+// From useAuth.ts
+export default function useAuth() {
+  const { data: me } = useSWR(
+    "/api/me",
+    async () => {
+      const { data } = await fetchDataClient<CheckAuthQuery>(gql`
+        query CheckAuth {
+          me {
+            user {
+              id
+              name
+              email
+              permissions { name }
+              roles { permissions { name } }
+            }
+          }
+        }
+      `);
+      return data.me;
+    },
+    { fallbackData: { user: null }, dedupingInterval: 2000 },
+  );
+  
+  return {
+    me,
+    register,
+    login,
+    forgotPassword,
+    resetPassword,
+    resendEmailVerification,
+    logout,
+  };
+}
+```
+
+### Current User Data
+
+`me` object contains:
+- `user` - User object or null if not authenticated
+- `user.id` - Unique user ID
+- `user.name` - Display name
+- `user.email` - Email address
+- `user.permissions` - Direct permissions
+- `user.roles` - Role-based permissions
+
+## LoginGate Component
+
+Protects authenticated content:
+
+```typescript
+// From LoginGate.tsx
+export function LoginGate({ children }) {
+  const { me } = useAuth();
+  
+  if (me.user) {
+    // User is already logged in
+    return <>{children}</>;
+  }
+  
+  return (
+    <Column>
+      <Text>You need to log in to continue:</Text>
+      <Row>
+        <LoginDialog />
+        <RegisterDialog />
+      </Row>
+    </Column>
+  );
+}
+```
+
+Usage:
+```typescript
+<LoginGate>
+  <PlaylistAddForm />
+</LoginGate>
+```
+
+<Note>
+  LoginGate automatically shows login/register buttons when user is not authenticated
+</Note>
+
+## Password Reset
+
+Users can reset forgotten passwords:
+
+<Steps>
+  <Step title="Request Reset">
+    Click "Forgot Password" link in login dialog
+  </Step>
+  
+  <Step title="Enter Email">
+    Provide registered email address
+  </Step>
+  
+  <Step title="Receive Link">
+    Password reset link sent via email
+  </Step>
+  
+  <Step title="Reset Password">
+    Follow link to set new password
+  </Step>
+</Steps>
+
+### Forgot Password Flow
+
+```typescript
+const forgotPassword = async (props: ForgotPasswordProps) => {
+  await csrf();
+  return axios.post(`${AUTH_PATH}/forgot-password`, props);
+};
+
+const resetPassword = async (props: ResetPasswordProps) => {
+  await csrf();
+  await axios.post(`${AUTH_PATH}/reset-password`, props);
+};
+```
+
+## User Logout
+
+Log out to end session:
+
+```typescript
+const logout = async () => {
+  await axios.post(`${AUTH_PATH}/logout`)
+    .then(() => mutateGlobal(() => true));
+};
+```
+
+Logout:
+- Invalidates session cookie
+- Clears user data from cache
+- Redirects to public view
+- Hides authenticated features
+
+## Authenticated Features
+
+Features requiring authentication:
+
+<CardGroup cols={2}>
+  <Card title="Playlists" icon="rectangle-list">
+    Create, edit, and manage custom playlists
+  </Card>
+  
+  <Card title="Watch History" icon="clock-rotate-left">
+    Automatic tracking of watched themes
+  </Card>
+  
+  <Card title="Profile" icon="user">
+    View and edit user profile information
+  </Card>
+  
+  <Card title="Settings" icon="gear">
+    Customize playback and display preferences
+  </Card>
+</CardGroup>
+
+## CSRF Protection
+
+All mutation requests protected by CSRF token:
+
+```typescript
+const csrf = () => axios.get(`/sanctum/csrf-cookie`);
+
+// Called before each mutation
+await csrf();
+await axios.post('/endpoint', data);
+```
+
+<Note>
+  CSRF token automatically included in request headers by axios
+</Note>
+
+## Session Management
+
+- Sessions stored server-side
+- Cookie-based authentication
+- Automatic session refresh
+- Configurable session lifetime
+- Remember me extends duration
+
+## Error Handling
+
+Authentication errors handled gracefully:
+
+```typescript
+export interface LoginErrors {
+  email?: Array<string>;
+}
+
+// Display errors inline
+{errors.email?.map((error) => (
+  <Text key={error} color="text-warning">
+    {error}
+  </Text>
+))}
+```
+
+Common errors:
+- **Invalid credentials** - Wrong email/password
+- **Account not found** - Email not registered
+- **Validation errors** - Form field issues
+- **Network errors** - Connection problems
+
+## Email Verification
+
+Optional email verification:
+
+```typescript
+const resendEmailVerification = async () => {
+  await axios.post(`${AUTH_PATH}/email/verification-notification`);
+};
+```
+
+Verification:
+- Required for certain features
+- Link sent on registration
+- Can be resent if expired
+
+## Permissions System
+
+Role-based access control:
+
+```typescript
+user {
+  permissions {
+    name // Direct permissions
+  }
+  roles {
+    permissions {
+      name // Role-based permissions
+    }
+  }
+}
+```
+
+Permissions control:
+- Admin features
+- Content moderation
+- Special access areas
+
+<Tip>
+  Check `me.user.permissions` to conditionally show admin features
+</Tip>
+
+## Authentication State
+
+Auth state managed with SWR:
+- Cached in memory
+- Auto-revalidation
+- Deduplication (2 second window)
+- Global state updates
+- Tab synchronization
+
+```typescript
+const { data: me } = useSWR(
+  "/api/me",
+  fetchUserData,
+  {
+    fallbackData: { user: null },
+    dedupingInterval: 2000,
+  }
+);
+```
+
+## Security Best Practices
+
+- ✅ HTTPS-only cookies
+- ✅ CSRF protection
+- ✅ SameSite cookie attribute
+- ✅ Secure password hashing (server-side)
+- ✅ Rate limiting on auth endpoints
+- ✅ Email verification option
+- ✅ Password strength requirements
+
+<Note>
+  Never store passwords in localStorage or expose sensitive data client-side
+</Note>

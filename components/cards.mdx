@@ -1,0 +1,263 @@
+---
+title: Card Components
+description: Card components for displaying content in structured containers
+---
+
+Card components provide structured, styled containers for displaying various types of content.
+
+## Card
+
+The base card component with customizable styling.
+
+### Usage
+
+```tsx
+import { Card } from "@/components/card/Card";
+
+<Card $hoverable={true} $color="text-primary">
+  <Text>Card content</Text>
+</Card>
+```
+
+### Props
+
+<ParamField path="$hoverable" type="boolean">
+  Adds hover effects and cursor pointer
+</ParamField>
+
+<ParamField path="$color" type="keyof Colors">
+  Accent color for the left border. Available colors from theme:
+  - `text-primary`
+  - `text-warning`
+  - `text-muted`
+  - And other theme colors
+</ParamField>
+
+### Styling
+
+<ParamField path="padding" type="string" default="16px 24px 16px 28px">
+  Internal padding with extra left space for accent border
+</ParamField>
+
+<ParamField path="border-radius" type="string">
+  Uses `theme.scalars.borderRadiusCard`
+</ParamField>
+
+<ParamField path="box-shadow" type="string">
+  Uses `theme.shadows.medium`
+</ParamField>
+
+### Source
+
+Defined in `/src/components/card/Card.ts:8`
+
+## SummaryCard
+
+A horizontal card for displaying summary information with an image.
+
+### Usage
+
+```tsx
+import { SummaryCard } from "@/components/card/SummaryCard";
+
+<SummaryCard
+  title="Anime Title"
+  description="2024 • Winter • TV"
+  image="/images/cover.jpg"
+  to="/anime/example"
+/>
+```
+
+### Props
+
+<ParamField path="title" type="string | ReactNode" required>
+  Card title, automatically linked if `to` prop is provided
+</ParamField>
+
+<ParamField path="description" type="string | ReactNode">
+  Secondary description text
+</ParamField>
+
+<ParamField path="image" type="string">
+  Image URL for the card thumbnail
+</ParamField>
+
+<ParamField path="imageProps" type="ComponentPropsWithoutRef<typeof StyledCover>">
+  Additional props for the image element, including:
+  - `$objectFit`: CSS object-fit value
+  - `$backgroundColor`: Background color
+</ParamField>
+
+<ParamField path="to" type="string">
+  Navigation link URL
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  Additional content rendered at the end of the card
+</ParamField>
+
+### SummaryCard.Description
+
+A helper component for formatting multiple description items with bullet separators.
+
+```tsx
+<SummaryCard
+  title="Example"
+  description={
+    <SummaryCard.Description>
+      {["2024", "Winter", "TV"]}
+    </SummaryCard.Description>
+  }
+/>
+```
+
+### Source
+
+Defined in `/src/components/card/SummaryCard.tsx:68`
+
+## ThemeDetailCard
+
+Displays theme information with video entries and playback options.
+
+### Usage
+
+```tsx
+import { ThemeDetailCard } from "@/components/card/ThemeDetailCard";
+import { ThemeDetailCardThemeFragment } from "@/generated/graphql";
+
+interface Props {
+  theme: ThemeDetailCardThemeFragment;
+}
+
+export function ThemeList({ theme }: Props) {
+  return <ThemeDetailCard theme={theme} />;
+}
+```
+
+### Props
+
+<ParamField path="theme" type="ThemeDetailCardThemeFragment" required>
+  GraphQL fragment containing:
+  - `type`: Theme type (OP, ED, etc.)
+  - `sequence`: Theme sequence number
+  - `song`: Song information with title and performances
+  - `anime`: Anime information
+  - `entries`: Array of theme entries with videos
+</ParamField>
+
+### GraphQL Fragment
+
+From `/src/components/card/ThemeDetailCard.tsx:96`:
+
+```graphql
+fragment ThemeDetailCardTheme on Theme {
+  type
+  sequence
+  group {
+    name
+    slug
+  }
+  anime {
+    slug
+    name
+  }
+  song {
+    title
+    performances {
+      alias
+      as
+      artist {
+        slug
+        name
+      }
+    }
+  }
+  entries {
+    version
+    episodes
+    spoiler
+    nsfw
+    videos {
+      filename
+      tags
+    }
+  }
+}
+```
+
+### Features
+
+- Displays theme type and sequence (e.g., "OP1")
+- Shows song title and artist performances
+- Lists all theme entry versions
+- Provides video playback buttons for each entry
+- Includes theme menu for additional actions
+
+### Example
+
+From `/src/components/card/ThemeDetailCard.tsx:60`:
+
+```tsx
+<StyledThemeCard>
+  <StyledRow>
+    <Text variant="small" color="text">
+      {theme.type}{theme.sequence || null}
+    </Text>
+    <Text>
+      <SongTitle song={theme.song} />
+      <Performances song={theme.song} expandable />
+    </Text>
+    <ThemeMenu theme={theme} />
+  </StyledRow>
+  {theme.entries.sort(entryVersionComparator).map((entry) => (
+    <StyledRow key={entry.version || 0}>
+      {/* Entry details and video buttons */}
+    </StyledRow>
+  ))}
+</StyledThemeCard>
+```
+
+### Source
+
+Defined in `/src/components/card/ThemeDetailCard.tsx:52`
+
+## AnnouncementCard
+
+Renders MDX announcement content.
+
+### Usage
+
+```tsx
+import { AnnouncementCard } from "@/components/card/AnnouncementCard";
+import type { MDXRemoteSerializeResult } from "next-mdx-remote";
+
+interface Props {
+  announcementSource: MDXRemoteSerializeResult;
+}
+
+export function Announcements({ announcementSource }: Props) {
+  return <AnnouncementCard announcementSource={announcementSource} />;
+}
+```
+
+### Props
+
+<ParamField path="announcementSource" type="MDXRemoteSerializeResult" required>
+  Serialized MDX content from next-mdx-remote
+</ParamField>
+
+### Source
+
+Defined in `/src/components/card/AnnouncementCard.tsx:10`
+
+## Styling Cards
+
+All card components support nested Solid contexts for adaptive backgrounds:
+
+```tsx
+<Solid>
+  <Card>
+    {/* Card background adjusts to solid-on-card color */}
+  </Card>
+</Solid>
+```

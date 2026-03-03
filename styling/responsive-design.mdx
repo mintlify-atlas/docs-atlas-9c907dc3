@@ -1,0 +1,306 @@
+---
+title: Responsive Design
+description: Media queries and responsive design patterns in AnimeThemes Web
+---
+
+AnimeThemes Web is designed to work seamlessly across mobile, tablet, and desktop devices using responsive design patterns and media queries.
+
+## Breakpoints
+
+The theme defines five standard breakpoints:
+
+```typescript src/theme/index.ts
+breakpoints: {
+  mobileMax: "720px",
+  tabletMin: "721px",
+  tabletMax: "870px",
+  desktopMin: "871px",
+  socialListMax: "1225px",
+}
+```
+
+### Breakpoint Strategy
+
+<CardGroup cols={3}>
+  <Card title="Mobile" icon="mobile">
+    ≤ 720px
+  </Card>
+  <Card title="Tablet" icon="tablet">
+    721px - 870px
+  </Card>
+  <Card title="Desktop" icon="desktop">
+    ≥ 871px
+  </Card>
+</CardGroup>
+
+## Media Queries in Styled Components
+
+### Using Theme Breakpoints
+
+Always reference theme breakpoints rather than hardcoding pixel values:
+
+```typescript
+import styled from "styled-components";
+
+const Container = styled.div`
+  padding: 24px;
+
+  @media (max-width: ${(props) => props.theme.breakpoints.mobileMax}) {
+    padding: 12px;
+  }
+
+  @media (min-width: ${(props) => props.theme.breakpoints.desktopMin}) {
+    padding: 32px;
+  }
+`;
+```
+
+### Mobile-First Approach
+
+Write styles for mobile devices first, then add media queries for larger screens:
+
+```typescript
+const Grid = styled.div`
+  /* Mobile: single column */
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+
+  /* Tablet: two columns */
+  @media (min-width: ${(props) => props.theme.breakpoints.tabletMin}) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Desktop: three columns */
+  @media (min-width: ${(props) => props.theme.breakpoints.desktopMin}) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+`;
+```
+
+## The useMediaQuery Hook
+
+The `useMediaQuery` hook provides a React-friendly way to respond to media queries:
+
+```typescript src/hooks/useMediaQuery.ts
+import useMediaQuery from "@/hooks/useMediaQuery";
+import theme from "@/theme";
+
+function ResponsiveComponent() {
+  const isMobile = useMediaQuery(
+    `(max-width: ${theme.breakpoints.mobileMax})`,
+    false
+  );
+
+  return (
+    <div>
+      {isMobile ? (
+        <MobileNavigation />
+      ) : (
+        <DesktopNavigation />
+      )}
+    </div>
+  );
+}
+```
+
+### Hook Signature
+
+<ParamField path="query" type="string" required>
+  The media query string to match (e.g., `"(max-width: 720px)"`)
+</ParamField>
+
+<ParamField path="initialIsMatching" type="boolean" default="false">
+  The initial matching state for server-side rendering
+</ParamField>
+
+<ResponseField name="isMatching" type="boolean">
+  Returns `true` if the media query matches, `false` otherwise
+</ResponseField>
+
+### Real-World Example
+
+From the IconTextButton component:
+
+```typescript src/components/button/IconTextButton.tsx
+import useMediaQuery from "@/hooks/useMediaQuery";
+import theme from "@/theme";
+
+export function IconTextButton({ icon, children }) {
+  const showTextOnMobile = useMediaQuery(
+    `(max-width: ${theme.breakpoints.mobileMax})`,
+    false
+  );
+
+  return (
+    <Button>
+      <Icon icon={icon} />
+      {!showTextOnMobile && <span>{children}</span>}
+    </Button>
+  );
+}
+```
+
+## Common Responsive Patterns
+
+### Responsive Navigation
+
+Hide text labels on mobile, show on desktop:
+
+```typescript
+const NavItem = styled.a`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  span {
+    display: none;
+
+    @media (min-width: ${(props) => props.theme.breakpoints.tabletMin}) {
+      display: inline;
+    }
+  }
+`;
+```
+
+### Responsive Grid Layouts
+
+Adapt column count based on screen size:
+
+```typescript
+const CardGrid = styled.div`
+  display: grid;
+  gap: 16px;
+
+  /* Mobile: 1 column */
+  grid-template-columns: 1fr;
+
+  /* Tablet: 2 columns */
+  @media (min-width: ${(props) => props.theme.breakpoints.tabletMin}) and 
+         (max-width: ${(props) => props.theme.breakpoints.tabletMax}) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Desktop: 4 columns */
+  @media (min-width: ${(props) => props.theme.breakpoints.desktopMin}) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+`;
+```
+
+### Responsive Typography
+
+```typescript
+const Heading = styled.h1`
+  font-size: 24px;
+  line-height: 1.2;
+
+  @media (min-width: ${(props) => props.theme.breakpoints.tabletMin}) {
+    font-size: 32px;
+  }
+
+  @media (min-width: ${(props) => props.theme.breakpoints.desktopMin}) {
+    font-size: 40px;
+  }
+`;
+```
+
+### Responsive Spacing
+
+Use CSS custom properties for responsive spacing:
+
+```typescript
+const Container = styled.div`
+  padding: var(--padding, 16px);
+
+  @media (max-width: ${(props) => props.theme.breakpoints.mobileMax}) {
+    --padding: 12px;
+  }
+
+  @media (min-width: ${(props) => props.theme.breakpoints.desktopMin}) {
+    --padding: 24px;
+  }
+`;
+```
+
+## Server-Side Rendering Considerations
+
+### Initial State
+
+When using `useMediaQuery`, provide an initial state for SSR:
+
+```typescript
+const isMobile = useMediaQuery(
+  `(max-width: ${theme.breakpoints.mobileMax})`,
+  false // Initial state for SSR
+);
+```
+
+<Warning>
+The initial state is used during server-side rendering. The hook will update to the correct value after client-side hydration. This may cause a brief flash of content.
+</Warning>
+
+### Avoiding Hydration Mismatches
+
+For critical layout differences, prefer CSS media queries over `useMediaQuery` to avoid hydration mismatches:
+
+```typescript
+// Preferred for layout
+const Layout = styled.div`
+  @media (max-width: ${(props) => props.theme.breakpoints.mobileMax}) {
+    flex-direction: column;
+  }
+`;
+
+// Use useMediaQuery for content differences
+function Component() {
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.mobileMax})`);
+  return isMobile ? <MobileContent /> : <DesktopContent />;
+}
+```
+
+## Testing Responsive Design
+
+### Browser DevTools
+
+1. Open browser DevTools (F12)
+2. Toggle device toolbar (Ctrl+Shift+M / Cmd+Shift+M)
+3. Test at different viewport sizes
+4. Check the defined breakpoints: 720px, 870px, 1225px
+
+### Common Test Sizes
+
+| Device | Width | Breakpoint |
+|--------|-------|------------|
+| Mobile (Portrait) | 375px | Mobile |
+| Mobile (Landscape) | 667px | Mobile |
+| Tablet (Portrait) | 768px | Tablet |
+| Tablet (Landscape) | 1024px | Desktop |
+| Desktop | 1920px | Desktop |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use theme breakpoints" icon="ruler">
+    Always reference `theme.breakpoints` instead of hardcoding pixel values
+  </Card>
+  <Card title="Mobile-first" icon="mobile">
+    Write base styles for mobile, then enhance for larger screens
+  </Card>
+  <Card title="Test thoroughly" icon="vial">
+    Test at all breakpoints, not just mobile and desktop
+  </Card>
+  <Card title="Consider performance" icon="gauge">
+    Use CSS media queries for layout, `useMediaQuery` for content
+  </Card>
+</CardGroup>
+
+<Tip>
+For responsive images, consider using Next.js Image component with the `sizes` prop to serve appropriately sized images for each breakpoint.
+</Tip>
+
+## Related Documentation
+
+- [Theming](/styling/theming) - Theme configuration and breakpoints
+- [Styled Components](/styling/styled-components) - Component styling patterns

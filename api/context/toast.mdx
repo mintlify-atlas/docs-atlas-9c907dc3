@@ -1,0 +1,297 @@
+---
+title: ToastContext
+description: React context for displaying toast notifications
+---
+
+## Overview
+
+The `ToastContext` provides a notification system for displaying temporary toast messages throughout the application. It manages toast lifecycle including automatic dismissal and manual closing.
+
+## Type Definitions
+
+```typescript
+interface IToastContext {
+    activeToasts: Array<Toast>;
+    dispatchToast: (id: string, toast: ReactNode, duration?: number) => void;
+    closeToast: (id: string) => void;
+}
+
+interface Toast {
+    id: string;
+    content: ReactNode;
+    timeoutId?: number;
+}
+
+interface ToastProviderProps {
+    children?: ReactNode;
+    initialToasts?: Array<Toast>;
+}
+```
+
+## Context Values
+
+<ResponseField name="activeToasts" type="Array<Toast>" required>
+  Array of currently displayed toast notifications.
+</ResponseField>
+
+<ResponseField name="dispatchToast" type="(id: string, toast: ReactNode, duration?: number) => void" required>
+  Displays a new toast notification. Parameters:
+  - `id`: Unique identifier for the toast (replacing existing toasts with same ID)
+  - `toast`: React content to display in the toast
+  - `duration`: Auto-dismiss duration in milliseconds (default: 5000). Set to 0 or negative to prevent auto-dismiss.
+</ResponseField>
+
+<ResponseField name="closeToast" type="(id: string) => void" required>
+  Manually closes a toast by its ID.
+</ResponseField>
+
+## Provider Usage
+
+The `ToastProvider` component is configured in `_app.tsx`:
+
+```typescript
+import { ToastProvider } from "@/context/toastContext";
+import { ToastHub } from "@/components/toast/ToastHub";
+
+function MyApp({ Component, pageProps }: AppProps) {
+    return (
+        <ToastProvider>
+            {/* App content */}
+            <Component {...pageProps} />
+            
+            {/* ToastHub renders active toasts */}
+            <ToastHub />
+        </ToastProvider>
+    );
+}
+```
+
+### Provider Props
+
+<ResponseField name="children" type="ReactNode">
+  Child components that will have access to the toast context.
+</ResponseField>
+
+<ResponseField name="initialToasts" type="Array<Toast>" default="[]">
+  Optional array of toasts to display on mount (useful for testing).
+</ResponseField>
+
+## Consumer Usage
+
+### Using the useToasts Hook
+
+The recommended way to access the toast context is through the `useToasts` hook:
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function MyComponent() {
+    const { dispatchToast } = useToasts();
+
+    const handleSuccess = () => {
+        dispatchToast(
+            "success-notification",
+            <span>Operation completed successfully!</span>,
+            3000
+        );
+    };
+
+    return <button onClick={handleSuccess}>Submit</button>;
+}
+```
+
+### Simple Text Toast
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function SaveButton() {
+    const { dispatchToast } = useToasts();
+
+    const handleSave = async () => {
+        try {
+            await saveData();
+            dispatchToast("save-success", "Saved successfully!");
+        } catch (error) {
+            dispatchToast("save-error", "Failed to save", 5000);
+        }
+    };
+
+    return <button onClick={handleSave}>Save</button>;
+}
+```
+
+### Rich Content Toast
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function ShareButton() {
+    const { dispatchToast } = useToasts();
+
+    const handleShare = async () => {
+        await navigator.clipboard.writeText(shareUrl);
+        
+        dispatchToast(
+            "share-success",
+            <div>
+                <strong>Link copied!</strong>
+                <p>Share this with your friends</p>
+            </div>,
+            4000
+        );
+    };
+
+    return <button onClick={handleShare}>Share</button>;
+}
+```
+
+### Persistent Toast
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function AnnouncementBanner() {
+    const { dispatchToast, closeToast } = useToasts();
+
+    useEffect(() => {
+        // Display persistent toast (duration = 0 prevents auto-dismiss)
+        dispatchToast(
+            "announcement",
+            <div>
+                Important announcement!
+                <button onClick={() => closeToast("announcement")}>Dismiss</button>
+            </div>,
+            0
+        );
+    }, [dispatchToast, closeToast]);
+
+    return null;
+}
+```
+
+## Real-World Usage Examples
+
+### In ShareMenu Component
+
+See: [src/components/menu/ShareMenu.tsx:21](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/menu/ShareMenu.tsx#L21)
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function ShareMenu() {
+    const { dispatchToast } = useToasts();
+
+    const handleCopyLink = async () => {
+        await navigator.clipboard.writeText(window.location.href);
+        dispatchToast("share-link", "Link copied to clipboard!");
+    };
+
+    return <button onClick={handleCopyLink}>Copy Link</button>;
+}
+```
+
+### In PlaylistTrackAddDialog Component
+
+See: [src/components/dialog/PlaylistTrackAddDialog.tsx:184](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/dialog/PlaylistTrackAddDialog.tsx#L184)
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function PlaylistTrackAddDialog() {
+    const { dispatchToast } = useToasts();
+
+    const handleAddToPlaylist = async () => {
+        try {
+            await addTrackMutation.mutateAsync();
+            dispatchToast(
+                "track-added",
+                <span>Track added to playlist successfully!</span>
+            );
+        } catch (error) {
+            dispatchToast(
+                "track-add-error",
+                <span>Failed to add track to playlist</span>
+            );
+        }
+    };
+
+    return <button onClick={handleAddToPlaylist}>Add to Playlist</button>;
+}
+```
+
+### In PasswordChangeDialog Component
+
+See: [src/components/dialog/PasswordChangeDialog.tsx:47](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/dialog/PasswordChangeDialog.tsx#L47)
+
+```typescript
+import { useToasts } from "@/context/toastContext";
+
+function PasswordChangeDialog() {
+    const { dispatchToast } = useToasts();
+
+    const handlePasswordChange = async (newPassword: string) => {
+        try {
+            await changePassword(newPassword);
+            dispatchToast(
+                "password-changed",
+                "Password changed successfully!",
+                3000
+            );
+        } catch (error) {
+            dispatchToast(
+                "password-error",
+                "Failed to change password. Please try again.",
+                5000
+            );
+        }
+    };
+
+    return <form onSubmit={handlePasswordChange}>...</form>;
+}
+```
+
+## Implementation Details
+
+### Toast Deduplication
+
+When dispatching a toast with an ID that already exists, the old toast is automatically removed and replaced with the new one. This prevents duplicate notifications:
+
+```typescript
+dispatchToast("network-error", "Connection failed");
+// Later...
+dispatchToast("network-error", "Still offline"); // Replaces previous toast
+```
+
+### Auto-Dismiss Behavior
+
+- Default duration is 5000ms (5 seconds)
+- Set `duration` to 0 or negative value to prevent auto-dismiss
+- Manually close persistent toasts using `closeToast(id)`
+
+### Rendering Toasts
+
+Toasts are rendered by the `ToastHub` component, which should be placed at the root level of your application:
+
+```typescript
+import { ToastHub } from "@/components/toast/ToastHub";
+import { useToasts } from "@/context/toastContext";
+
+function ToastHub() {
+    const { activeToasts } = useToasts();
+
+    return (
+        <div className="toast-container">
+            {activeToasts.map((toast) => (
+                <div key={toast.id} className="toast">
+                    {toast.content}
+                </div>
+            ))}
+        </div>
+    );
+}
+```
+
+## Source
+
+Source code: [src/context/toastContext.tsx](https://github.com/AnimeThemes/animethemes-web/blob/main/src/context/toastContext.tsx)

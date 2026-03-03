@@ -1,0 +1,156 @@
+---
+title: useColorTheme
+description: Hook for managing the application's color theme with persistent storage
+---
+
+Manages the application's color theme preference (light, dark, or system) with automatic localStorage persistence and DOM synchronization.
+
+## Import
+
+```typescript
+import useColorTheme from "@/hooks/useColorTheme";
+```
+
+## Type Definitions
+
+```typescript
+type ColorTheme = "system" | "light" | "dark";
+```
+
+## Usage
+
+```typescript
+const [theme, setTheme] = useColorTheme();
+```
+
+## Return Value
+
+Returns a tuple with the current theme and a setter function:
+
+<ResponseField name="[0]" type="ColorTheme">
+  The current color theme value. Can be `"system"`, `"light"`, or `"dark"`.
+</ResponseField>
+
+<ResponseField name="[1]" type="(colorTheme: ColorTheme) => void">
+  Function to update the color theme. The new theme is automatically saved to localStorage and applied to the document.
+</ResponseField>
+
+## Examples
+
+### Basic Theme Switcher
+
+```typescript
+import useColorTheme from "@/hooks/useColorTheme";
+
+function ThemeSwitcher() {
+    const [colorTheme, setColorTheme] = useColorTheme();
+
+    return (
+        <div>
+            <p>Current theme: {colorTheme}</p>
+            <button onClick={() => setColorTheme("light")}>Light</button>
+            <button onClick={() => setColorTheme("dark")}>Dark</button>
+            <button onClick={() => setColorTheme("system")}>System</button>
+        </div>
+    );
+}
+```
+
+### Theme Toggle
+
+```typescript
+import useColorTheme from "@/hooks/useColorTheme";
+
+function ThemeToggle() {
+    const [colorTheme, setColorTheme] = useColorTheme();
+
+    const toggleTheme = () => {
+        if (colorTheme === "light") {
+            setColorTheme("dark");
+        } else if (colorTheme === "dark") {
+            setColorTheme("system");
+        } else {
+            setColorTheme("light");
+        }
+    };
+
+    return (
+        <button onClick={toggleTheme}>
+            Theme: {colorTheme}
+        </button>
+    );
+}
+```
+
+### App-Level Theme Management
+
+```typescript
+import { type AppProps } from "next/app";
+import useColorTheme from "@/hooks/useColorTheme";
+import ColorThemeContext from "@/context/colorThemeContext";
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+    const [colorTheme, setColorTheme] = useColorTheme();
+
+    return (
+        <ColorThemeContext.Provider value={{ colorTheme, setColorTheme }}>
+            <Component {...pageProps} />
+        </ColorThemeContext.Provider>
+    );
+}
+```
+
+### Conditional Styling Based on Theme
+
+```typescript
+import useColorTheme from "@/hooks/useColorTheme";
+
+function ThemedComponent() {
+    const [colorTheme] = useColorTheme();
+
+    const isDark = colorTheme === "dark" || 
+        (colorTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+    return (
+        <div style={{
+            backgroundColor: isDark ? "#1a1a1a" : "#ffffff",
+            color: isDark ? "#ffffff" : "#000000"
+        }}>
+            Content styled based on theme
+        </div>
+    );
+}
+```
+
+## Implementation Details
+
+- Persists theme preference to localStorage under the key `"theme"`
+- Defaults to `"system"` if no preference is stored
+- Automatically applies theme to `document.documentElement.dataset.theme` for CSS access
+- Supports server-side injection of initial theme via `data-theme` attribute
+- On mount, checks for injected theme and updates state accordingly
+- Synchronizes theme changes to the DOM automatically
+- Source: `/home/daytona/workspace/source/src/hooks/useColorTheme.ts:8`
+
+## CSS Integration
+
+The hook sets the theme on the document element, which can be accessed in CSS:
+
+```css
+/* Light theme styles */
+[data-theme="light"] {
+    --background: white;
+    --text: black;
+}
+
+/* Dark theme styles */
+[data-theme="dark"] {
+    --background: black;
+    --text: white;
+}
+
+/* System theme styles */
+[data-theme="system"] {
+    /* Uses system preference via media queries */
+}
+```

@@ -1,0 +1,381 @@
+---
+title: Serialization
+description: MDX and Markdown serialization utilities for content rendering
+---
+
+The `serializeMarkdown` module provides utilities for parsing and serializing Markdown/MDX content with support for syntax highlighting, heading extraction, and GitHub-flavored Markdown.
+
+## Import
+
+```typescript
+import serializeMarkdown, { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+import type { Heading } from "@/utils/rehypeExtractHeadings";
+```
+
+## Functions
+
+### `serializeMarkdown`
+
+```typescript
+async function serializeMarkdown(
+  markdown: Compatible
+): Promise<{
+  source: MDXRemoteSerializeResult;
+  headings: Heading[];
+}>
+```
+
+Serializes Markdown/MDX content into a format that can be rendered by `next-mdx-remote`, with automatic heading extraction.
+
+**Parameters:**
+- `markdown` (`Compatible`) - The Markdown/MDX content to serialize. Can be a string, Buffer, or VFile.
+
+**Returns:**
+- `Promise<{ source, headings }>` - An object containing:
+  - `source` - Serialized MDX content ready for rendering
+  - `headings` - Array of extracted headings with their text, depth, and slug
+
+**Features:**
+- GitHub-flavored Markdown support (tables, strikethrough, task lists, etc.)
+- Automatic heading slug generation
+- Syntax highlighting with `github-dark-dimmed` theme
+- Frontmatter parsing
+
+**Plugins Used:**
+- `remark-gfm` - GitHub-flavored Markdown support
+- `rehype-slug` - Automatic heading ID generation
+- `rehype-pretty-code` - Syntax highlighting for code blocks
+- `rehypeExtractHeadings` - Custom plugin to extract heading metadata
+
+**Usage Example:**
+
+```typescript
+import serializeMarkdown from "@/utils/serializeMarkdown";
+import { MDXRemote } from "next-mdx-remote";
+
+const markdown = `
+# Hello World
+
+This is **bold** and this is *italic*.
+
+\`\`\`typescript
+const greeting = "Hello";
+\`\`\`
+`;
+
+const { source, headings } = await serializeMarkdown(markdown);
+
+// In your component:
+return (
+  <>
+    <MDXRemote {...source} />
+    <nav>
+      {headings.map((heading) => (
+        <a key={heading.slug} href={`#${heading.slug}`}>
+          {heading.text}
+        </a>
+      ))}
+    </nav>
+  </>
+);
+```
+
+### `serializeMarkdownSafe`
+
+```typescript
+async function serializeMarkdownSafe(
+  markdown: Compatible
+): Promise<{
+  source: MDXRemoteSerializeResult;
+  headings: Heading[];
+}>
+```
+
+Safely serializes Markdown/MDX content with error handling. If parsing fails, it returns a serialized error message instead of throwing.
+
+**Parameters:**
+- `markdown` (`Compatible`) - The Markdown/MDX content to serialize
+
+**Returns:**
+- `Promise<{ source, headings }>` - Same as `serializeMarkdown`, but guaranteed not to throw
+
+**Error Handling:**
+If serialization fails, instead of throwing an error, it returns serialized content showing:
+```markdown
+*Failed to parse Markdown!*
+
+```
+[error message]
+```
+```
+
+**Usage Example:**
+
+```typescript
+// src/pages/anime/[animeSlug]/index.tsx
+import { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+
+interface AnimePageProps {
+  synopsis: MDXRemoteSerializeResult | null;
+}
+
+export const getStaticProps: GetStaticProps<AnimePageProps> = async ({ params }) => {
+  const { data } = await fetchAnime(params.animeSlug);
+  
+  return {
+    props: {
+      synopsis: data.anime.synopsis
+        ? (await serializeMarkdownSafe(data.anime.synopsis)).source
+        : null,
+    },
+  };
+};
+
+function AnimePage({ synopsis }: AnimePageProps) {
+  return (
+    <>
+      {synopsis && <MDXRemote {...synopsis} />}
+    </>
+  );
+}
+```
+
+## Types
+
+### `Heading`
+
+```typescript
+interface Heading {
+  text: string;   // The heading text content
+  depth: number;  // Heading level (1-6)
+  slug: string;   // URL-safe slug for linking
+}
+```
+
+Represents an extracted heading from the Markdown content.
+
+**Example:**
+
+```typescript
+const headings: Heading[] = [
+  { text: "Getting Started", depth: 1, slug: "getting-started" },
+  { text: "Installation", depth: 2, slug: "installation" },
+  { text: "Configuration", depth: 2, slug: "configuration" },
+];
+```
+
+## Real-World Examples
+
+### Anime Synopsis Rendering
+
+```typescript
+// src/pages/anime/[animeSlug]/index.tsx
+import { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+import { MDXRemote } from "next-mdx-remote";
+import type { MDXRemoteSerializeResult } from "next-mdx-remote";
+
+interface AnimePageProps {
+  anime: {
+    name: string;
+    synopsis: MDXRemoteSerializeResult | null;
+  };
+}
+
+export const getStaticProps: GetStaticProps<AnimePageProps> = async (context) => {
+  const { data } = await fetchAnime(context.params.animeSlug);
+  
+  return {
+    props: {
+      anime: {
+        name: data.anime.name,
+        synopsis: data.anime.synopsis
+          ? (await serializeMarkdownSafe(data.anime.synopsis)).source
+          : null,
+      },
+    },
+  };
+};
+
+function AnimePage({ anime }: AnimePageProps) {
+  return (
+    <div>
+      <h1>{anime.name}</h1>
+      {anime.synopsis && (
+        <section>
+          <h2>Synopsis</h2>
+          <MDXRemote {...anime.synopsis} />
+        </section>
+      )}
+    </div>
+  );
+}
+```
+
+### Artist Information Rendering
+
+```typescript
+// src/pages/artist/[artistSlug]/index.tsx
+import { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+import type { MDXRemoteSerializeResult } from "next-mdx-remote";
+
+interface ArtistPageProps {
+  artist: {
+    name: string;
+    information: MDXRemoteSerializeResult | null;
+  };
+}
+
+export const getStaticProps: GetStaticProps<ArtistPageProps> = async (context) => {
+  const { data } = await fetchArtist(context.params.artistSlug);
+  
+  return {
+    props: {
+      artist: {
+        name: data.artist.name,
+        information: data.artist.information
+          ? (await serializeMarkdownSafe(data.artist.information)).source
+          : null,
+      },
+    },
+  };
+};
+```
+
+### Custom Page with Table of Contents
+
+```typescript
+// src/pages/[...pageSlug]/index.tsx
+import { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+import { MDXRemote } from "next-mdx-remote";
+import type { MDXRemoteSerializeResult } from "next-mdx-remote";
+import type { Heading } from "@/utils/rehypeExtractHeadings";
+
+interface PageProps {
+  source: MDXRemoteSerializeResult;
+  headings: Heading[];
+}
+
+export const getStaticProps: GetStaticProps<PageProps> = async (context) => {
+  const { data } = await fetchPage(context.params.pageSlug);
+  
+  const { source, headings } = await serializeMarkdownSafe(data.page.body);
+  
+  return {
+    props: {
+      source,
+      headings,
+    },
+  };
+};
+
+function CustomPage({ source, headings }: PageProps) {
+  return (
+    <div>
+      <aside>
+        <nav>
+          <h2>Table of Contents</h2>
+          <ul>
+            {headings.map((heading) => (
+              <li key={heading.slug} style={{ paddingLeft: `${(heading.depth - 1) * 12}px` }}>
+                <a href={`#${heading.slug}`}>{heading.text}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </aside>
+      <main>
+        <MDXRemote {...source} />
+      </main>
+    </div>
+  );
+}
+```
+
+### Announcement Feed
+
+```typescript
+// src/pages/index.tsx
+import { serializeMarkdownSafe } from "@/utils/serializeMarkdown";
+import type { MDXRemoteSerializeResult } from "next-mdx-remote";
+
+interface HomePageProps {
+  announcements: Array<{
+    id: string;
+    content: MDXRemoteSerializeResult;
+  }>;
+}
+
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+  const { data } = await fetchAnnouncements();
+  
+  return {
+    props: {
+      announcements: await Promise.all(
+        data.announcements.map(async (announcement) => ({
+          id: announcement.id,
+          content: (await serializeMarkdownSafe(announcement.content)).source,
+        }))
+      ),
+    },
+  };
+};
+```
+
+## Syntax Highlighting
+
+Code blocks are automatically syntax highlighted using `rehype-pretty-code` with the `github-dark-dimmed` theme.
+
+**Supported Languages:**
+
+All languages supported by Shiki, including:
+- JavaScript/TypeScript
+- JSX/TSX
+- Python
+- Rust
+- Go
+- And many more
+
+**Example:**
+
+```markdown
+\`\`\`typescript
+interface User {
+  name: string;
+  email: string;
+}
+
+const user: User = {
+  name: "John Doe",
+  email: "john@example.com",
+};
+\`\`\`
+```
+
+## GitHub-Flavored Markdown
+
+The following GFM features are supported:
+
+- **Tables**
+- **Strikethrough** (`~~text~~`)
+- **Task lists** (`- [ ]` and `- [x]`)
+- **Autolinks**
+- **Footnotes**
+
+**Example:**
+
+```markdown
+| Column 1 | Column 2 |
+|----------|----------|
+| Value 1  | Value 2  |
+
+~~Strikethrough text~~
+
+- [x] Completed task
+- [ ] Pending task
+```
+
+## See Also
+
+- [next-mdx-remote](https://github.com/hashicorp/next-mdx-remote) - Server-side MDX rendering
+- [rehype-pretty-code](https://rehype-pretty-code.netlify.app/) - Syntax highlighting
+- [remark-gfm](https://github.com/remarkjs/remark-gfm) - GitHub-flavored Markdown plugin

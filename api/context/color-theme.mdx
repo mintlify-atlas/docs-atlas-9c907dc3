@@ -1,0 +1,96 @@
+---
+title: ColorThemeContext
+description: React context for managing the application's color theme preference
+---
+
+## Overview
+
+The `ColorThemeContext` provides theme management functionality for the application, allowing users to choose between system, light, or dark color themes.
+
+## Type Definitions
+
+```typescript
+type ColorTheme = "system" | "light" | "dark";
+
+interface IColorThemeContext {
+    colorTheme: ColorTheme;
+    setColorTheme: (colorTheme: ColorTheme) => void;
+}
+```
+
+## Context Values
+
+<ResponseField name="colorTheme" type="ColorTheme" required>
+  The current color theme setting. Can be `"system"`, `"light"`, or `"dark"`.
+</ResponseField>
+
+<ResponseField name="setColorTheme" type="(colorTheme: ColorTheme) => void" required>
+  Function to update the color theme preference. Accepts one of the three valid theme values.
+</ResponseField>
+
+## Provider Usage
+
+The `ColorThemeContext.Provider` is configured in `_app.tsx`:
+
+```typescript
+import ColorThemeContext from "@/context/colorThemeContext";
+import useColorTheme from "@/hooks/useColorTheme";
+
+function MyApp({ Component, pageProps }: AppProps) {
+    const [colorTheme, setColorTheme] = useColorTheme();
+
+    return (
+        <ColorThemeContext.Provider value={{ colorTheme, setColorTheme }}>
+            {/* App content */}
+        </ColorThemeContext.Provider>
+    );
+}
+```
+
+## Consumer Usage
+
+### Using useContext Hook
+
+```typescript
+import { useContext } from "react";
+import ColorThemeContext from "@/context/colorThemeContext";
+
+function ThemeSwitcher() {
+    const { colorTheme, setColorTheme } = useContext(ColorThemeContext);
+
+    return (
+        <div>
+            <button onClick={() => setColorTheme("light")}>Light</button>
+            <button onClick={() => setColorTheme("dark")}>Dark</button>
+            <button onClick={() => setColorTheme("system")}>System</button>
+            <p>Current theme: {colorTheme}</p>
+        </div>
+    );
+}
+```
+
+## Utility Functions
+
+### isColorTheme
+
+Type guard function to validate if a string is a valid color theme:
+
+```typescript
+function isColorTheme(value?: string | null): value is ColorTheme
+```
+
+**Example:**
+
+```typescript
+import { isColorTheme } from "@/context/colorThemeContext";
+
+const userPref = localStorage.getItem("theme");
+
+if (isColorTheme(userPref)) {
+    setColorTheme(userPref);
+}
+```
+
+## Source
+
+Source code: [src/context/colorThemeContext.ts](https://github.com/AnimeThemes/animethemes-web/blob/main/src/context/colorThemeContext.ts)

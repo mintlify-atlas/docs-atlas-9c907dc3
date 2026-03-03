@@ -1,0 +1,474 @@
+---
+title: GraphQL Types
+description: Reference documentation for GraphQL types in the AnimeThemes schema
+---
+
+## Overview
+
+The GraphQL schema defines the structure of data available in the AnimeThemes Web application. This page documents all available types, their fields, and relationships.
+
+## Core Types
+
+### Anime
+
+Represents an anime entry in the database.
+
+```graphql
+type Anime implements ResourceWithImages {
+  id: Int!
+  name: String!
+  slug: String!
+  year: Int
+  season: String
+  synopsis: String
+  media_format: String
+  synonyms: [Synonym!]!
+  themes: [Theme!]!
+  series: [Series!]!
+  resources: [Resource!]!
+  images: [Image!]!
+  studios: [Studio!]!
+}
+```
+
+**Fields:**
+- `id`: Unique identifier
+- `name`: Official anime name
+- `slug`: URL-friendly identifier
+- `year`: Year of premiere
+- `season`: Season of premiere (Winter, Spring, Summer, Fall)
+- `synopsis`: Description of the anime
+- `media_format`: Format (TV, Movie, OVA, etc.)
+- `synonyms`: Alternative titles
+- `themes`: Opening and ending themes
+- `series`: Related series
+- `resources`: External links (AniList, MyAnimeList, etc.)
+- `images`: Cover images
+- `studios`: Animation studios
+
+### Theme
+
+Represents an opening or ending theme.
+
+```graphql
+type Theme {
+  id: Int!
+  type: String!
+  sequence: Int
+  song: Song
+  group: ThemeGroup
+  anime: Anime!
+  entries: [Entry!]!
+}
+```
+
+**Fields:**
+- `id`: Unique identifier
+- `type`: Theme type (OP for opening, ED for ending)
+- `sequence`: Theme number (1, 2, 3, etc.)
+- `song`: Associated song
+- `group`: Theme group (if part of a group)
+- `anime`: Associated anime
+- `entries`: Different versions of the theme
+
+### Entry
+
+Represents a specific version of a theme.
+
+```graphql
+type Entry {
+  id: Int!
+  version: Int
+  episodes: String
+  nsfw: Boolean!
+  spoiler: Boolean!
+  theme: Theme!
+  videos: [Video!]!
+}
+```
+
+**Fields:**
+- `id`: Unique identifier
+- `version`: Version number
+- `episodes`: Episode range this version appears in
+- `nsfw`: Whether the video contains NSFW content
+- `spoiler`: Whether the video contains spoilers
+- `theme`: Parent theme
+- `videos`: Available video files
+
+### Video
+
+Represents a video file.
+
+```graphql
+type Video {
+  id: Int!
+  filename: String!
+  basename: String!
+  path: String!
+  size: Int!
+  mimetype: String!
+  link: String!
+  resolution: Int
+  nc: Boolean!
+  subbed: Boolean!
+  lyrics: Boolean!
+  uncen: Boolean!
+  source: VideoSource
+  overlap: VideoOverlap!
+  tags: String!
+  audio: Audio!
+  script: VideoScript
+  entries: [Entry!]!
+  tracks: [PlaylistTrack!]!
+}
+```
+
+**Fields:**
+- `filename`: Full filename
+- `basename`: Base filename without extension
+- `link`: Direct download/stream URL
+- `resolution`: Video resolution (480, 720, 1080)
+- `nc`: No credits (creditless version)
+- `subbed`: Has subtitles
+- `lyrics`: Has lyrics overlay
+- `uncen`: Uncensored version
+- `source`: Video source (WEB, BD, DVD, etc.)
+- `overlap`: Transition overlap type
+- `audio`: Associated audio file
+- `script`: Associated subtitle script
+
+### Artist
+
+Represents a musical artist or group.
+
+```graphql
+type Artist implements ResourceWithImages {
+  id: Int!
+  name: String!
+  slug: String!
+  information: String
+  performances: [Performance!]!
+  members: [ArtistMembership!]!
+  groups: [ArtistMembership!]!
+  resources: [Resource!]!
+  images: [Image!]!
+}
+```
+
+**Fields:**
+- `id`: Unique identifier
+- `name`: Artist name
+- `slug`: URL-friendly identifier
+- `information`: Biography or additional information
+- `performances`: Songs performed by the artist
+- `members`: Group members (if this is a group)
+- `groups`: Groups this artist is a member of
+- `resources`: External links
+- `images`: Artist images
+
+### Song
+
+Represents a musical composition.
+
+```graphql
+type Song {
+  id: Int
+  title: String
+  themes: [Theme!]!
+  performances: [Performance!]!
+}
+```
+
+**Fields:**
+- `id`: Unique identifier
+- `title`: Song title
+- `themes`: Themes using this song
+- `performances`: Artist performances of this song
+
+### Performance
+
+Represents an artist's performance of a song.
+
+```graphql
+type Performance {
+  song: Song!
+  artist: Artist!
+  alias: String
+  as: String
+}
+```
+
+**Fields:**
+- `song`: The performed song
+- `artist`: The performing artist
+- `alias`: Artist alias used for this performance
+- `as`: Character name (if performing as a character)
+
+## Supporting Types
+
+### Series
+
+Represents a series of related anime.
+
+```graphql
+type Series {
+  id: Int!
+  slug: String!
+  name: String!
+  anime: [Anime!]!
+}
+```
+
+### Studio
+
+Represents an animation studio.
+
+```graphql
+type Studio implements ResourceWithImages {
+  id: Int!
+  slug: String!
+  name: String!
+  anime: [Anime!]!
+  resources: [Resource!]!
+  images: [Image!]!
+}
+```
+
+### Year and Season
+
+```graphql
+type Year {
+  value: Int!
+  seasons: [Season!]!
+}
+
+type Season {
+  value: String!
+  year: Year
+  anime: [Anime!]!
+}
+```
+
+### Image
+
+Represents an image file.
+
+```graphql
+type Image {
+  id: Int!
+  path: String!
+  size: Int!
+  mimetype: String!
+  depth: Int
+  facet: String
+  link: String!
+}
+```
+
+**Facet types:**
+- `Small Cover`: Small thumbnail
+- `Large Cover`: Large cover image
+- `Grill`: Character artwork
+
+### Resource
+
+Represents an external resource link.
+
+```graphql
+type Resource {
+  id: Int!
+  link: String
+  external_id: Int
+  site: String
+  as: String
+}
+```
+
+**Common sites:**
+- AniDB
+- AniList
+- Anime-Planet
+- Kitsu
+- MyAnimeList
+- Official Site
+
+## User and Playlist Types
+
+### User Types
+
+```graphql
+interface User {
+  id: Int!
+  name: String!
+}
+
+type UserPublic implements User {
+  id: Int!
+  name: String!
+}
+
+type UserAuth implements User {
+  id: Int!
+  name: String!
+  email: String!
+  email_verified_at: String
+  created_at: String!
+  permissions: [Permission!]!
+  roles: [UserRole!]!
+}
+```
+
+### Playlist Types
+
+```graphql
+type Playlist {
+  id: String!
+  name: String!
+  description: String
+  visibility: PlaylistVisibility!
+  tracks_count: Int!
+  tracks: [PlaylistTrack!]!
+  forward: [PlaylistTrack!]!
+  user: UserPublic!
+}
+
+enum PlaylistVisibility {
+  Public
+  Unlisted
+  Private
+}
+
+type PlaylistTrack {
+  id: String!
+  entry: Entry!
+  video: Video!
+  playlist: Playlist!
+  previous: PlaylistTrack
+  next: PlaylistTrack
+}
+```
+
+## Special Types
+
+### FeaturedTheme
+
+```graphql
+type FeaturedTheme {
+  id: Int!
+  start_at: String!
+  end_at: String!
+  video: Video
+  entry: Entry
+}
+```
+
+### Announcement
+
+```graphql
+type Announcement {
+  id: Int
+  content: String!
+}
+```
+
+### Page
+
+```graphql
+type Page {
+  id: Int
+  slug: String!
+  name: String!
+  body: String!
+  created_at: String!
+}
+```
+
+## Enums
+
+### VideoSource
+
+```graphql
+enum VideoSource {
+  WEB  # Web stream
+  RAW  # Raw broadcast
+  BD   # Blu-ray
+  DVD  # DVD
+  VHS  # VHS
+  LD   # LaserDisc
+}
+```
+
+### VideoOverlap
+
+```graphql
+enum VideoOverlap {
+  NONE       # No overlap
+  TRANSITION # Transition overlap
+  OVER       # Over overlap
+}
+```
+
+## Interfaces
+
+### ResourceWithImages
+
+Implemented by types that can have images.
+
+```graphql
+interface ResourceWithImages {
+  images: [Image!]!
+}
+```
+
+**Implementing types:**
+- Anime
+- Artist
+- Studio
+
+## Type Generation
+
+The project uses GraphQL Code Generator to create TypeScript types from the schema. Configuration is in `/codegen.ts`:
+
+```typescript
+const config: CodegenConfig = {
+  schema: [
+    "src/lib/common/animethemes/type-defs.ts",
+    "src/lib/server/animebracket/type-defs.ts",
+  ],
+  generates: {
+    "src/generated/graphql.ts": {
+      plugins: ["typescript", "typescript-operations"],
+    },
+    "src/generated/graphql-resolvers.ts": {
+      plugins: ["typescript", "typescript-resolvers"],
+    },
+  },
+};
+```
+
+Generated types are available at:
+- `/src/generated/graphql.ts` - Query and mutation types
+- `/src/generated/graphql-resolvers.ts` - Resolver types
+
+## Type Mappers
+
+The codegen configuration maps GraphQL types to API response types:
+
+```typescript
+mappers: {
+  Anime: "@/lib/common/animethemes/types#ApiAnime",
+  Artist: "@/lib/common/animethemes/types#ApiArtist",
+  Theme: "@/lib/common/animethemes/types#ApiTheme",
+  Video: "@/lib/common/animethemes/types#ApiVideo",
+  // ...
+}
+```
+
+This ensures type safety between the GraphQL schema and the underlying API responses.
+
+## Next Steps
+
+- [GraphQL Queries](/api/graphql/queries) - Learn how to query these types
+- [GraphQL Resolvers](/api/graphql/resolvers) - Understand how data is fetched
+- [Working with API](/guides/working-with-api) - Guide to using the AnimeThemes API

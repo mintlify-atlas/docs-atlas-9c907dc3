@@ -1,0 +1,311 @@
+---
+title: useEntitySearch
+description: Generic hook for paginated entity search with infinite loading
+---
+
+A generic hook for implementing paginated search functionality with infinite scrolling capabilities using TanStack Query (React Query).
+
+## Import
+
+```typescript
+import useEntitySearch from "@/hooks/useEntitySearch";
+```
+
+## Type Definitions
+
+```typescript
+import type { SearchArgs } from "@/generated/graphql";
+import type { SimpleSearchArgs } from "@/lib/client/search";
+
+type FetchResults<T> = (searchArgs: SearchArgs) => Promise<{
+    data: Array<T>;
+    nextPage: number | null;
+}>;
+```
+
+## Usage
+
+```typescript
+const queryResult = useEntitySearch<T>(
+    entity,
+    fetchResults,
+    searchArgs
+);
+```
+
+## Parameters
+
+<ParamField path="entity" type="string" required>
+  The name of the entity being searched (e.g., "anime", "artist", "theme"). Used for query key generation.
+</ParamField>
+
+<ParamField path="fetchResults" type="FetchResults<T>" required>
+  Async function that fetches search results. Must return an object with:
+  - `data`: Array of results
+  - `nextPage`: Next page number or `null` if no more pages
+</ParamField>
+
+<ParamField path="searchArgs" type="SimpleSearchArgs" required>
+  Search parameters object containing:
+  - `query`: Search query string
+  - `filters`: Optional filter object
+  - `sortBy`: Optional sort field
+  - Other search-related parameters
+</ParamField>
+
+## Return Value
+
+Returns a TanStack Query `useInfiniteQuery` result object:
+
+<ResponseField name="data" type="InfiniteData<{ data: T[], nextPage: number | null }>">
+  Paginated data structure containing all fetched pages
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  Error object if the query failed
+</ResponseField>
+
+<ResponseField name="fetchNextPage" type="() => Promise<InfiniteQueryObserverResult>">
+  Function to fetch the next page of results
+</ResponseField>
+
+<ResponseField name="hasNextPage" type="boolean">
+  Whether there are more pages available to fetch
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  Whether the query encountered an error
+</ResponseField>
+
+<ResponseField name="isFetchingNextPage" type="boolean">
+  Whether the next page is currently being fetched
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  Whether the initial page is loading
+</ResponseField>
+
+<ResponseField name="isPlaceholderData" type="boolean">
+  Whether the data is placeholder data from a previous query
+</ResponseField>
+
+## Examples
+
+### Basic Entity Search
+
+```typescript
+import useEntitySearch from "@/hooks/useEntitySearch";
+import type { Anime } from "@/generated/graphql";
+
+function AnimeSearch({ query }: { query: string }) {
+    const { data, isLoading, isError, error } = useEntitySearch<Anime>(
+        "anime",
+        fetchAnimeResults,
+        { query }
+    );
+
+    if (isLoading) return <div>Searching...</div>;
+    if (isError) return <div>Error: {error.message}</div>;
+
+    const results = data?.pages.flatMap((page) => page.data) ?? [];
+
+    return (
+        <div>
+            <h2>Found {results.length} anime</h2>
+            {results.map((anime) => (
+                <div key={anime.id}>{anime.name}</div>
+            ))}
+        </div>
+    );
+}
+
+async function fetchAnimeResults(searchArgs: SearchArgs) {
+    const response = await fetch("/api/anime/search", {
+        method: "POST",
+        body: JSON.stringify(searchArgs),
+    });
+    return response.json();
+}
+```
+
+### Infinite Scrolling Search
+
+```typescript
+import { useRef, useEffect } from "react";
+import useEntitySearch from "@/hooks/useEntitySearch";
+import type { Theme } from "@/generated/graphql";
+
+function InfiniteThemeSearch({ query, filters }: { query: string; filters: any }) {
+    const observerRef = useRef<IntersectionObserver>();
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+    } = useEntitySearch<Theme>(
+        "theme",
+        fetchThemeResults,
+        { query, filters }
+    );
+
+    useEffect(() => {
+        if (loadMoreRef.current) {
+            observerRef.current = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                        fetchNextPage();
+                    }
+                },
+                { threshold: 0.1 }
+            );
+            observerRef.current.observe(loadMoreRef.current);
+        }
+
+        return () => observerRef.current?.disconnect();
+    }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+    const results = data?.pages.flatMap((page) => page.data) ?? [];
+
+    return (
+        <div>
+            {results.map((theme) => (
+                <div key={theme.id}>{theme.name}</div>
+            ))}
+            {isLoading && <div>Loading...</div>}
+            {isFetchingNextPage && <div>Loading more...</div>}
+            <div ref={loadMoreRef} style={{ height: "20px" }} />
+        </div>
+    );
+}
+```
+
+### SearchEntity Component Pattern
+
+```typescript
+import type { ReactNode } from "react";
+import useEntitySearch from "@/hooks/useEntitySearch";
+import type { SearchArgs } from "@/generated/graphql";
+import type { SimpleSearchArgs } from "@/lib/client/search";
+
+interface SearchEntityProps<T> {
+    entity: string;
+    fetchResults: (searchArgs: SearchArgs) => Promise<{
+        data: Array<T>;
+        nextPage: number | null;
+    }>;
+    searchArgs: SimpleSearchArgs;
+    filters: ReactNode;
+    renderResult: (result: T) => ReactNode;
+}
+
+export function SearchEntity<T>({
+    entity,
+    fetchResults,
+    searchArgs,
+    filters,
+    renderResult,
+}: SearchEntityProps<T>) {
+    const {
+        data,
+        error,
+        fetchNextPage,
+        hasNextPage,
+        isError,
+        isFetchingNextPage,
+        isLoading,
+        isPlaceholderData,
+    } = useEntitySearch<T>(entity, fetchResults, searchArgs);
+
+    if (isError) {
+        return <div>Error: {error.message}</div>;
+    }
+
+    if (isLoading) {
+        return <div>Searching...</div>;
+    }
+
+    const results = data?.pages.flatMap((page) => page.data) ?? [];
+
+    if (!results.length) {
+        return <div>No results found for "{searchArgs.query}"</div>;
+    }
+
+    return (
+        <div>
+            {filters}
+            <div className={isPlaceholderData ? "loading" : ""}>
+                {results.map((result) => renderResult(result))}
+            </div>
+            {hasNextPage && (
+                <button
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                >
+                    {isFetchingNextPage ? "Loading..." : "Load More"}
+                </button>
+            )}
+        </div>
+    );
+}
+```
+
+### With Filters and Sorting
+
+```typescript
+import { useState } from "react";
+import useEntitySearch from "@/hooks/useEntitySearch";
+
+function ArtistSearch() {
+    const [query, setQuery] = useState("");
+    const [sortBy, setSortBy] = useState("name");
+    const [filters, setFilters] = useState({ active: true });
+
+    const { data, isLoading } = useEntitySearch(
+        "artist",
+        fetchArtistResults,
+        { query, sortBy, filters }
+    );
+
+    const results = data?.pages.flatMap((page) => page.data) ?? [];
+
+    return (
+        <div>
+            <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search artists..."
+            />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="name">Name</option>
+                <option value="popularity">Popularity</option>
+            </select>
+            <label>
+                <input
+                    type="checkbox"
+                    checked={filters.active}
+                    onChange={(e) => setFilters({ active: e.target.checked })}
+                />
+                Active only
+            </label>
+            {isLoading ? <div>Loading...</div> : (
+                <div>{results.map((artist) => (
+                    <div key={artist.id}>{artist.name}</div>
+                ))}</div>
+            )}
+        </div>
+    );
+}
+```
+
+## Implementation Details
+
+- Built on TanStack Query's `useInfiniteQuery` hook
+- Automatically converts `SimpleSearchArgs` to GraphQL `SearchArgs` format
+- Uses `keepPreviousData` to prevent UI flickering during refetches
+- Query key includes entity name and all search arguments for proper caching
+- Initial page starts at 1
+- Next page determined by `nextPage` field in fetch results
+- Source: `/home/daytona/workspace/source/src/hooks/useEntitySearch.ts:7`

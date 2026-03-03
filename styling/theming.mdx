@@ -1,0 +1,279 @@
+---
+title: Theming
+description: Color themes and design tokens in AnimeThemes Web
+---
+
+AnimeThemes Web implements a comprehensive theming system with support for light, dark, and system-based color themes, built on CSS custom properties and styled-components.
+
+## Theme Structure
+
+The theme is defined in `src/theme/index.ts` and provides:
+
+```typescript src/theme/index.ts
+const theme = {
+  breakpoints: {
+    mobileMax: "720px",
+    tabletMin: "721px",
+    tabletMax: "870px",
+    desktopMin: "871px",
+    socialListMax: "1225px",
+  },
+  shadows: createThemeDefinition(shadows),
+  colors: createThemeDefinition(colors),
+  zIndices: {
+    navigation: 10,
+    switcherButton: 1,
+    switcherText: 2,
+    videoPlayer: 5,
+    videoPlayerOverlay: 6,
+    toast: 45,
+    menuOverlay: 41,
+    menuPopover: 40,
+    dialog: 50,
+    dialogBackdrop: 49,
+  },
+  scalars: {
+    borderRadiusCard: "4px",
+  },
+};
+```
+
+## Color System
+
+### Base Colors
+
+The color palette includes grayscale, primary (teal), and warning (red) color scales:
+
+```typescript src/theme/colors/index.ts
+const baseColors = {
+  transparent: "#00000000",
+  white: "#ffffff",
+  "gray-100": "#f5f2fa",
+  "gray-200": "#e6e1f0",
+  "gray-300": "#d1cae0",
+  "gray-400": "#9f93b8",
+  "gray-500": "#72658c",
+  "gray-600": "#574e6a",
+  "gray-700": "#453d53",
+  "gray-800": "#2e293a",
+  "gray-900": "#1c1823",
+  "primary-100": "#d1fbf1",
+  "primary-200": "#a5f6e4",
+  "primary-300": "#75ead4",
+  "primary-400": "#52d4bf",
+  "primary-500": "#40b8a6",
+  "primary-600": "#319488",
+  "primary-700": "#28766e",
+  "primary-800": "#215e59",
+  "primary-900": "#1e4e4a",
+  "warning-100": "#fee2e2",
+  // ... more warning colors
+  gold: "gold",
+};
+```
+
+### Semantic Colors
+
+Semantic color tokens are mapped from base colors:
+
+```typescript
+export const colors = {
+  ...baseColors,
+  background: baseColors["gray-100"],
+  solid: baseColors["white"],
+  "solid-primary": baseColors["primary-700"],
+  "solid-warning": baseColors["warning-700"],
+  "solid-on-card": baseColors["gray-200"],
+  text: baseColors["gray-900"],
+  "text-muted": baseColors["gray-500"],
+  "text-disabled": baseColors["gray-400"],
+  "text-warning": baseColors["warning-600"],
+  "text-primary": baseColors["primary-600"],
+  "text-on-primary": baseColors["primary-100"],
+};
+```
+
+<Note>
+Semantic colors provide meaning (e.g., `text-muted`, `solid-primary`) rather than using raw color values. This makes it easier to maintain consistent theming.
+</Note>
+
+## Color Theme Switching
+
+### Available Themes
+
+Users can choose between three color themes:
+
+<CardGroup cols={3}>
+  <Card title="Light" icon="sun">
+    Light background with dark text
+  </Card>
+  <Card title="Dark" icon="moon">
+    Dark background with light text
+  </Card>
+  <Card title="System" icon="desktop">
+    Follows system preference
+  </Card>
+</CardGroup>
+
+### Using the Color Theme Hook
+
+The `useColorTheme` hook manages theme state:
+
+```typescript src/hooks/useColorTheme.ts
+import useColorTheme from "@/hooks/useColorTheme";
+
+function ThemeSwitcher() {
+  const [theme, setTheme] = useColorTheme();
+
+  return (
+    <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+      <option value="system">System</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  );
+}
+```
+
+### Theme Persistence
+
+The selected theme is persisted to localStorage and synchronized with the DOM:
+
+```typescript
+const [theme, setTheme] = useLocalStorageState<ColorTheme>("theme", {
+  defaultValue: "system",
+});
+
+useEffect(() => {
+  document.documentElement.dataset.theme = theme;
+}, [theme]);
+```
+
+The theme is applied via a `data-theme` attribute on the root `<html>` element.
+
+## Using Theme in Components
+
+### In Styled Components
+
+Access theme values through the `theme` prop:
+
+```typescript
+import styled from "styled-components";
+
+const Card = styled.div`
+  background-color: ${(props) => props.theme.colors.solid};
+  color: ${(props) => props.theme.colors.text};
+  box-shadow: ${(props) => props.theme.shadows.low};
+  border-radius: ${(props) => props.theme.scalars.borderRadiusCard};
+
+  @media (max-width: ${(props) => props.theme.breakpoints.mobileMax}) {
+    padding: 12px;
+  }
+`;
+```
+
+### CSS Custom Properties
+
+All theme colors are exposed as CSS custom properties:
+
+```css
+.custom-element {
+  background: var(--primary-500);
+  color: var(--text);
+  box-shadow: var(--shadow-low);
+}
+```
+
+## Shadows
+
+Three shadow levels are available:
+
+```typescript src/theme/colors/index.ts
+export const shadows = {
+  low: `1px 2px 2px hsl(262deg 20% 50% / 0.4)`,
+  medium: `
+    1px 2px 2px hsl(262deg 20% 50% / 0.15),
+    2px 4px 4px hsl(262deg 20% 50% / 0.15),
+    3px 6px 6px hsl(262deg 20% 50% / 0.15)
+  `,
+  high: `
+    1px 2px 2px hsl(262deg 20% 50% / 0.1),
+    2px 4px 4px hsl(262deg 20% 50% / 0.1),
+    4px 8px 8px hsl(262deg 20% 50% / 0.1),
+    8px 16px 16px hsl(262deg 20% 50% / 0.1),
+    16px 32px 32px hsl(262deg 20% 50% / 0.1)
+  `,
+};
+```
+
+Usage:
+
+```typescript
+const Button = styled.button`
+  box-shadow: ${(props) => props.theme.shadows.low};
+
+  &:hover {
+    box-shadow: ${(props) => props.theme.shadows.medium};
+  }
+`;
+```
+
+## Z-Index Management
+
+Consistent layering is enforced through theme z-indices:
+
+```typescript
+const VideoPlayer = styled.div`
+  z-index: ${(props) => props.theme.zIndices.videoPlayer};
+`;
+
+const Dialog = styled.div`
+  z-index: ${(props) => props.theme.zIndices.dialog};
+`;
+```
+
+### Z-Index Scale
+
+| Element | Z-Index | Purpose |
+|---------|---------|----------|
+| `navigation` | 10 | Site navigation |
+| `videoPlayer` | 5 | Video player |
+| `videoPlayerOverlay` | 6 | Player controls |
+| `menuPopover` | 40 | Dropdown menus |
+| `menuOverlay` | 41 | Menu backdrop |
+| `toast` | 45 | Toast notifications |
+| `dialogBackdrop` | 49 | Dialog backdrop |
+| `dialog` | 50 | Modal dialogs |
+
+## Theme Provider
+
+The theme is provided to all components via `ThemeProvider` in `_app.tsx`:
+
+```typescript src/pages/_app.tsx
+import { ThemeProvider } from "styled-components";
+import theme from "@/theme";
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <ThemeProvider theme={theme}>
+      <Component {...pageProps} />
+    </ThemeProvider>
+  );
+}
+```
+
+## Best Practices
+
+<Tip>
+**Always use semantic color tokens** (like `text-muted`, `solid-primary`) instead of raw color values (like `gray-500`). This ensures consistent theming and makes it easier to support light/dark modes.
+</Tip>
+
+<Warning>
+Avoid hardcoding color values, shadow values, or z-index numbers. Always reference theme properties to maintain consistency.
+</Warning>
+
+## Related Documentation
+
+- [Styled Components](/styling/styled-components) - Using styled-components
+- [Color Theme Hook](/api/hooks/use-color-theme) - Theme switching API
+- [Color Theme Context](/api/context/color-theme) - Theme context

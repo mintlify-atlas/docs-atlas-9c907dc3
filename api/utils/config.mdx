@@ -1,0 +1,261 @@
+---
+title: Config
+description: Environment configuration and validation utilities
+---
+
+The `config` module provides centralized access to environment variables and configuration validation for the AnimeThemes Web application.
+
+## Import
+
+```typescript
+import {
+  SERVER_API_URL,
+  CLIENT_API_URL,
+  VIDEO_URL,
+  AUDIO_URL,
+  AUTH_PATH,
+  AUTH_REFERER,
+  BASE_PATH,
+  STAGING,
+  VERBOSE_LOGS,
+  PAGINATION_PAGE_SIZE,
+  ANALYZE,
+  MINIMAL_BUILD,
+  validateConfig,
+} from "@/utils/config";
+```
+
+## Configuration Constants
+
+### Server-side Only
+
+These environment variables are only available on the server:
+
+#### `SERVER_API_URL`
+
+```typescript
+const SERVER_API_URL: string | undefined
+```
+
+The API URL used for server-side requests. Loaded from `ANIMETHEMES_API_URL` environment variable.
+
+#### `ANALYZE`
+
+```typescript
+const ANALYZE: boolean
+```
+
+Enables bundle analysis mode. Loaded from `ANALYZE` environment variable.
+
+#### `MINIMAL_BUILD`
+
+```typescript
+const MINIMAL_BUILD: boolean
+```
+
+Enables minimal build mode for faster development builds. Loaded from `MINIMAL_BUILD` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/utils/fetchStaticPaths.ts
+import { MINIMAL_BUILD } from "@/utils/config";
+
+if (MINIMAL_BUILD) {
+  // Skip generating most static paths for faster builds
+  return { paths: [], fallback: "blocking" };
+}
+```
+
+#### `AUTH_REFERER`
+
+```typescript
+const AUTH_REFERER: string
+```
+
+The referer header value for authentication requests. Loaded from `AUTH_REFERER` environment variable.
+
+### Client-side + Server-side
+
+These environment variables are available on both client and server (prefixed with `NEXT_PUBLIC_`):
+
+#### `CLIENT_API_URL`
+
+```typescript
+const CLIENT_API_URL: string | undefined
+```
+
+The API URL used for client-side requests. Loaded from `NEXT_PUBLIC_API_URL` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/lib/common/animethemes/api.ts
+import { CLIENT_API_URL, SERVER_API_URL } from "@/utils/config";
+
+export const API_URL = `${SERVER_API_URL || CLIENT_API_URL}`;
+```
+
+#### `VIDEO_URL`
+
+```typescript
+const VIDEO_URL: string | undefined
+```
+
+The base URL for video files. Loaded from `NEXT_PUBLIC_VIDEO_URL` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/components/video-player/VideoPlayer.tsx
+import { VIDEO_URL, AUDIO_URL } from "@/utils/config";
+
+const videoSrc = `${VIDEO_URL}/${video.filename}`;
+const audioSrc = audio ? `${AUDIO_URL}/${audio.filename}` : undefined;
+```
+
+#### `AUDIO_URL`
+
+```typescript
+const AUDIO_URL: string | undefined
+```
+
+The base URL for audio files. Loaded from `NEXT_PUBLIC_AUDIO_URL` environment variable.
+
+#### `AUTH_PATH`
+
+```typescript
+const AUTH_PATH: string | undefined
+```
+
+The authentication path for OAuth flows. Loaded from `NEXT_PUBLIC_AUTH_PATH` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/hooks/useAuth.ts
+import { AUTH_PATH } from "@/utils/config";
+
+const loginUrl = `${AUTH_PATH}/login`;
+```
+
+#### `BASE_PATH`
+
+```typescript
+const BASE_PATH: string
+```
+
+The base path for the application. Defaults to empty string. Loaded from `NEXT_PUBLIC_BASE_PATH` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/utils/withBasePath.ts
+import { BASE_PATH } from "@/utils/config";
+
+export default function withBasePath(path: string) {
+  return `${BASE_PATH}${path}`;
+}
+```
+
+#### `STAGING`
+
+```typescript
+const STAGING: boolean
+```
+
+Indicates whether the application is running in staging mode. Loaded from `NEXT_PUBLIC_STAGING` environment variable.
+
+#### `VERBOSE_LOGS`
+
+```typescript
+const VERBOSE_LOGS: boolean
+```
+
+Enables verbose logging. Loaded from `NEXT_PUBLIC_VERBOSE_LOGS` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/utils/devLog.ts
+import { VERBOSE_LOGS } from "@/utils/config";
+
+export default function devLog(...args: unknown[]) {
+  if (VERBOSE_LOGS) {
+    console.log(...args);
+  }
+}
+```
+
+#### `PAGINATION_PAGE_SIZE`
+
+```typescript
+const PAGINATION_PAGE_SIZE: number | null
+```
+
+The default page size for paginated API requests. Loaded from `NEXT_PUBLIC_PAGINATION_PAGE_SIZE` environment variable.
+
+**Usage Example:**
+
+```typescript
+// src/lib/common/animethemes/api.ts
+import { PAGINATION_PAGE_SIZE } from "@/utils/config";
+
+const pageSize = PAGINATION_PAGE_SIZE || 15;
+```
+
+## Functions
+
+### `validateConfig`
+
+```typescript
+function validateConfig(): boolean
+```
+
+Validates the application configuration and logs warnings/errors for missing or misconfigured environment variables.
+
+**Returns:**
+- `boolean` - `true` if configuration is valid, `false` if critical configuration is missing
+
+**Validation Rules:**
+
+1. **Error:** At least one of `SERVER_API_URL` or `CLIENT_API_URL` must be specified
+2. **Warning:** If only `SERVER_API_URL` is specified, client-side API requests won't work
+3. **Warning:** Missing `VIDEO_URL` will prevent videos from playing
+4. **Warning:** Missing `AUDIO_URL` will prevent audios from playing
+5. **Warning:** Missing `AUTH_PATH` should be fixed in production
+
+**Usage Example:**
+
+```typescript
+import { validateConfig } from "@/utils/config";
+
+// In application initialization
+if (!validateConfig()) {
+  process.exit(1);
+}
+```
+
+## Environment Variables Reference
+
+| Variable | Type | Required | Description |
+|----------|------|----------|-------------|
+| `ANIMETHEMES_API_URL` | string | Yes* | Server-side API URL |
+| `NEXT_PUBLIC_API_URL` | string | Yes* | Client-side API URL |
+| `NEXT_PUBLIC_VIDEO_URL` | string | Recommended | Video files base URL |
+| `NEXT_PUBLIC_AUDIO_URL` | string | Recommended | Audio files base URL |
+| `NEXT_PUBLIC_AUTH_PATH` | string | Production | OAuth authentication path |
+| `AUTH_REFERER` | string | Optional | Auth request referer |
+| `NEXT_PUBLIC_BASE_PATH` | string | Optional | Application base path |
+| `NEXT_PUBLIC_STAGING` | boolean | Optional | Staging mode flag |
+| `NEXT_PUBLIC_VERBOSE_LOGS` | boolean | Optional | Verbose logging flag |
+| `NEXT_PUBLIC_PAGINATION_PAGE_SIZE` | number | Optional | Default page size |
+| `ANALYZE` | boolean | Optional | Bundle analysis flag |
+| `MINIMAL_BUILD` | boolean | Optional | Minimal build flag |
+
+\* At least one API URL must be specified
+
+## See Also
+
+- [Configuration Guide](/configuration) - Environment variables guide
+- [GraphQL Layer](/architecture/graphql-layer) - How the API client uses these values

@@ -1,0 +1,172 @@
+---
+title: FullscreenContext
+description: React context for managing fullscreen mode in the video player
+---
+
+## Overview
+
+The `FullscreenContext` provides fullscreen state management for the video player, with special handling for iOS devices that don't support the standard Fullscreen API.
+
+## Type Definitions
+
+```typescript
+interface FullscreenContextValue {
+    isFullscreen: boolean;
+    toggleFullscreen(): void;
+}
+```
+
+## Context Values
+
+<ResponseField name="isFullscreen" type="boolean" required>
+  Indicates whether the application is currently in fullscreen mode.
+</ResponseField>
+
+<ResponseField name="toggleFullscreen" type="() => void" required>
+  Toggles fullscreen mode on and off. On iOS devices, this triggers native video fullscreen instead of document fullscreen.
+</ResponseField>
+
+## Provider Usage
+
+The `FullscreenContext.Provider` is configured in `_app.tsx` using the `ahooks` `useFullscreen` hook:
+
+```typescript
+import { useCallback } from "react";
+import { useFullscreen } from "ahooks";
+import FullscreenContext from "@/context/fullscreenContext";
+
+function MyApp({ Component, pageProps }: AppProps) {
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+    const [isFullscreen, { toggleFullscreen: nativeToggleFullscreen }] = useFullscreen(
+        () => document.documentElement,
+        {
+            onEnter() {
+                document.documentElement.dataset.fullscreen = "true";
+            },
+            onExit() {
+                delete document.documentElement.dataset.fullscreen;
+            },
+        }
+    );
+
+    const toggleFullscreen = useCallback(() => {
+        if (isIOS) {
+            // iOS does not support the Fullscreen API
+            const videoElement = document.querySelector("video");
+            if (videoElement && "webkitEnterFullscreen" in videoElement) {
+                (videoElement as HTMLVideoElement & { 
+                    webkitEnterFullscreen: () => void 
+                }).webkitEnterFullscreen();
+            }
+        } else {
+            nativeToggleFullscreen();
+        }
+    }, [isIOS, nativeToggleFullscreen]);
+
+    return (
+        <FullscreenContext.Provider value={{ isFullscreen, toggleFullscreen }}>
+            {/* App content */}
+        </FullscreenContext.Provider>
+    );
+}
+```
+
+## Consumer Usage
+
+### Basic Usage
+
+```typescript
+import { useContext } from "react";
+import FullscreenContext from "@/context/fullscreenContext";
+
+function FullscreenButton() {
+    const { isFullscreen, toggleFullscreen } = useContext(FullscreenContext);
+
+    return (
+        <button onClick={toggleFullscreen}>
+            {isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+        </button>
+    );
+}
+```
+
+### With Icon Toggle
+
+```typescript
+import { useContext } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faExpand, faCompress } from "@fortawesome/pro-solid-svg-icons";
+import FullscreenContext from "@/context/fullscreenContext";
+
+function FullscreenControl() {
+    const { isFullscreen, toggleFullscreen } = useContext(FullscreenContext);
+
+    return (
+        <button 
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+        >
+            <FontAwesomeIcon icon={isFullscreen ? faCompress : faExpand} />
+        </button>
+    );
+}
+```
+
+## Real-World Usage Examples
+
+### In VideoPlayer Component
+
+See: [src/components/video-player/VideoPlayer.tsx:88](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/video-player/VideoPlayer.tsx#L88)
+
+```typescript
+const { toggleFullscreen } = useContext(FullscreenContext);
+
+// Toggle fullscreen with keyboard shortcut
+useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+        if (event.key === "f") {
+            toggleFullscreen();
+        }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+}, [toggleFullscreen]);
+```
+
+### In VideoPlayerOverlay Component
+
+See: [src/components/video-player/VideoPlayerOverlay.tsx:96](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/video-player/VideoPlayerOverlay.tsx#L96)
+
+```typescript
+const { isFullscreen, toggleFullscreen } = useContext(FullscreenContext);
+
+return (
+    <div className="player-controls">
+        <button onClick={toggleFullscreen}>
+            {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        </button>
+    </div>
+);
+```
+
+## Platform Considerations
+
+### iOS Handling
+
+On iOS devices, the standard Fullscreen API is not supported. The context provider automatically detects iOS and uses the WebKit-specific `webkitEnterFullscreen()` method on the video element instead.
+
+### Data Attribute
+
+When fullscreen mode is active, the provider sets `data-fullscreen="true"` on the document element, which can be used for CSS styling:
+
+```css
+html[data-fullscreen="true"] {
+    /* Fullscreen-specific styles */
+}
+```
+
+## Source
+
+Source code: [src/context/fullscreenContext.ts](https://github.com/AnimeThemes/animethemes-web/blob/main/src/context/fullscreenContext.ts)

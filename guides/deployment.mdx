@@ -1,0 +1,403 @@
+---
+title: Deployment
+description: Guide to building and deploying AnimeThemes Web
+---
+
+This guide covers the build process, deployment configuration, and best practices for deploying AnimeThemes Web to production.
+
+## Build Process
+
+<Steps>
+
+<Step title="Configure environment variables">
+
+Create a `.env.local` file (or configure in your hosting platform) with required environment variables:
+
+```bash .env.local
+# Required: API URLs
+ANIMETHEMES_API_URL=https://api.animethemes.moe
+NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+
+# Required: Media URLs
+NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+
+# Required: Authentication
+NEXT_PUBLIC_AUTH_PATH=/auth
+AUTH_REFERER=https://animethemes.moe
+
+# Optional: Base path for subdirectory deployment
+NEXT_PUBLIC_BASE_PATH=
+
+# Optional: Pagination
+NEXT_PUBLIC_PAGINATION_PAGE_SIZE=25
+
+# Optional: Feature flags
+NEXT_PUBLIC_STAGING=false
+NEXT_PUBLIC_VERBOSE_LOGS=false
+```
+
+</Step>
+
+<Step title="Run the production build">
+
+Build the application for production:
+
+```bash
+npm run build
+```
+
+This command:
+1. Compiles Next.js configuration (`next.config.ts` → `next.config.mjs`)
+2. Generates all static pages using `getStaticProps` and `getStaticPaths`
+3. Optimizes images and assets
+4. Creates production bundles with code splitting
+
+The build process uses Next.js Turbopack for faster compilation.
+
+</Step>
+
+<Step title="Start the production server">
+
+Start the production server:
+
+```bash
+npm run start
+```
+
+The server will run on port 3000 by default. You can change this with:
+
+```bash
+PORT=8080 npm run start
+```
+
+</Step>
+
+</Steps>
+
+## Build Configuration
+
+### Next.js Configuration
+
+The build is configured in `next.config.ts`:
+
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+    // Base path for subdirectory deployment
+    basePath: BASE_PATH,
+    
+    // Enable React strict mode
+    reactStrictMode: true,
+    
+    // Enable styled-components compiler
+    compiler: {
+        styledComponents: true,
+    },
+    
+    // Increase timeout for static generation (1 hour)
+    staticPageGenerationTimeout: 3600,
+    
+    // Optimize build for caching between pages
+    experimental: {
+        workerThreads: false,
+        cpus: 1,
+    },
+    
+    // Transpile specific packages
+    transpilePackages: ["ahooks"],
+};
+```
+
+See the full configuration at `next.config.ts:19`.
+
+### Environment Variable Validation
+
+Environment variables are validated on startup in `src/utils/config.ts`:
+
+```typescript src/utils/config.ts
+function validateConfig() {
+    let isValid = true;
+    if (!SERVER_API_URL && !CLIENT_API_URL) {
+        error("You need to specify ANIMETHEMES_API_URL or NEXT_PUBLIC_API_URL");
+        isValid = false;
+    }
+    if (SERVER_API_URL && !CLIENT_API_URL) {
+        warn("It is highly recommended to specify NEXT_PUBLIC_API_URL");
+    }
+    if (!VIDEO_URL) {
+        warn("It is recommended to specify NEXT_PUBLIC_VIDEO_URL");
+    }
+    return isValid;
+}
+```
+
+The build will fail if required variables are missing.
+
+## Static Site Generation (SSG)
+
+### How SSG Works
+
+The project uses Next.js Static Site Generation to pre-render all pages at build time:
+
+1. **Build Time**: `getStaticPaths` generates a list of all pages
+2. **Build Time**: `getStaticProps` fetches data for each page
+3. **Runtime**: Pages are served as static HTML
+4. **Revalidation**: ISR updates pages in the background
+
+### Incremental Static Regeneration (ISR)
+
+Pages are automatically revalidated after a set time:
+
+```tsx src/pages/anime/[animeSlug]/index.tsx
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+    // Fetch data...
+    
+    return {
+        props: { ... },
+        // Revalidate after 1 hour (3600 seconds)
+        revalidate: 3600,
+    };
+};
+```
+
+This means:
+- First request after 1 hour gets stale data (fast)
+- Triggers regeneration in background
+- Subsequent requests get fresh data
+
+### Build Time Caching
+
+The project caches data between pages during build:
+
+```tsx src/pages/anime/[animeSlug]/index.tsx
+const buildTimeCache: Map<string, AnimeDetailPageQuery> = new Map();
+
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+    // Check cache first
+    let data = params ? buildTimeCache.get(params.animeSlug) : null;
+    
+    if (!data) {
+        // Fetch if not cached
+        ({ data, apiRequests } = await fetchData(...));
+    }
+    
+    return { props: { ... } };
+};
+
+export const getStaticPaths: GetStaticPaths = () => {
+    return fetchStaticPaths(async () => {
+        const { data } = await fetchData(...);
+        
+        // Populate cache
+        data.animeAll.forEach((anime) => 
+            buildTimeCache.set(anime.slug, { anime })
+        );
+        
+        return data.animeAll.map(...);
+    });
+};
+```
+
+See this pattern at `src/pages/anime/[animeSlug]/index.tsx:189`.
+
+## Deployment Options
+
+### Vercel (Recommended)
+
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in the Vercel dashboard
+3. Deploy automatically on push
+
+Vercel Configuration:
+```json vercel.json
+{
+    "buildCommand": "npm run build",
+    "framework": "nextjs",
+    "installCommand": "npm ci"
+}
+```
+
+### Docker
+
+Create a Dockerfile for containerized deployment:
+
+```dockerfile Dockerfile
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set build-time environment variables
+ENV ANIMETHEMES_API_URL=https://api.animethemes.moe
+ENV NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+ENV NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+ENV NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/next.config.mjs ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]
+```
+
+### Static Export (Not Supported)
+
+Note: This project cannot be deployed as a fully static export because it uses:
+- ISR (Incremental Static Regeneration)
+- Server-side API routes (`/api/*`)
+- `notFound: true` in `getStaticProps`
+
+## Performance Optimization
+
+### Bundle Analysis
+
+Analyze your bundle size:
+
+```bash
+ANALYZE=true npm run build
+```
+
+This opens an interactive bundle analyzer showing:
+- Size of each package
+- Code splitting effectiveness
+- Opportunities for optimization
+
+### Build Optimization
+
+The project includes several optimizations:
+
+1. **Code Splitting**: Automatic per-route splitting
+2. **Image Optimization**: Next.js Image component
+3. **Styled Components**: SSR with `styledComponents: true`
+4. **Tree Shaking**: Removes unused code
+5. **Minification**: Production builds are minified
+
+### Static Generation Timeout
+
+For large sites, increase the timeout:
+
+```typescript next.config.ts
+const nextConfig: NextConfig = {
+    // 1 hour timeout for static generation
+    staticPageGenerationTimeout: 3600,
+};
+```
+
+## Security Headers
+
+The project includes security headers in `next.config.ts:33`:
+
+```typescript next.config.ts
+async headers() {
+    return [
+        {
+            source: "/:path*",
+            headers: [
+                {
+                    key: "X-DNS-Prefetch-Control",
+                    value: "on",
+                },
+                {
+                    key: "Strict-Transport-Security",
+                    value: "max-age=63072000; includeSubDomains; preload",
+                },
+                {
+                    key: "X-XSS-Protection",
+                    value: "1; mode=block",
+                },
+                {
+                    key: "X-Frame-Options",
+                    value: "SAMEORIGIN",
+                },
+                {
+                    key: "X-Content-Type-Options",
+                    value: "nosniff",
+                },
+                {
+                    key: "Referrer-Policy",
+                    value: "origin-when-cross-origin",
+                },
+            ],
+        },
+    ];
+}
+```
+
+## Troubleshooting
+
+### Build Fails
+
+1. **Check environment variables**: Ensure all required variables are set
+2. **Check TypeScript errors**: Run `npm run type-check`
+3. **Check linting**: Run `npm run lint`
+4. **Clear cache**: Delete `.next` folder and rebuild
+
+### Out of Memory
+
+Increase Node.js memory:
+
+```bash
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
+```
+
+### Slow Build
+
+For faster development builds, use minimal build mode:
+
+```bash
+MINIMAL_BUILD=true npm run build
+```
+
+This generates fewer pages for testing.
+
+## Monitoring
+
+Track API requests during build:
+
+```tsx src/pages/index.tsx
+export const getStaticProps: GetStaticProps = async () => {
+    const { data, apiRequests } = await fetchData(...);
+    
+    return {
+        props: {
+            ...getSharedPageProps(apiRequests), // Tracks API usage
+            // ... other props
+        },
+    };
+};
+```
+
+## Best Practices
+
+- Set appropriate `revalidate` times for ISR (1 hour is a good default)
+- Use build-time caching to reduce API calls
+- Monitor bundle size with `ANALYZE=true`
+- Test production build locally before deploying
+- Use environment-specific variables for different stages
+- Set up error tracking (Sentry, etc.)
+- Configure CDN for static assets
+- Enable compression on your server
+- Use a reverse proxy (Nginx) for additional security
+- Monitor API rate limits during build
+
+## Next Steps
+
+- Learn about [adding pages](/guides/adding-pages)
+- Understand [creating components](/guides/creating-components)
+- Read about [working with the API](/guides/working-with-api)

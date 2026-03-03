@@ -1,0 +1,386 @@
+---
+title: Creating Components
+description: Guide to creating and organizing components in AnimeThemes Web
+---
+
+This guide explains how to create new components in AnimeThemes Web using styled-components and TypeScript.
+
+## Component Structure
+
+Components are organized in `src/components/` by category:
+
+```
+src/components/
+├── button/          # Button components
+├── card/            # Card components
+├── text/            # Text components
+├── box/             # Layout components (Flex, Solid)
+├── image/           # Image components
+└── ...
+```
+
+## Creating a Basic Component
+
+<Steps>
+
+<Step title="Create the component file">
+
+Create a new file in the appropriate subdirectory:
+
+```tsx src/components/badge/Badge.tsx
+import { type ComponentPropsWithRef } from "react";
+import styled from "styled-components";
+import theme from "@/theme";
+
+interface BadgeProps extends ComponentPropsWithRef<"span"> {
+    variant?: "primary" | "warning" | "default";
+}
+
+export function Badge({ variant = "default", children, ...props }: BadgeProps) {
+    return (
+        <StyledBadge $variant={variant} {...props}>
+            {children}
+        </StyledBadge>
+    );
+}
+
+const StyledBadge = styled.span<{ $variant: string }>`
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    
+    background-color: ${
+        (props) => {
+            if (props.$variant === "primary") return theme.colors["solid-primary"];
+            if (props.$variant === "warning") return theme.colors["solid-warning"];
+            return theme.colors["solid"];
+        }
+    };
+    
+    color: ${
+        (props) => {
+            if (props.$variant === "primary") return theme.colors["text-on-primary"];
+            if (props.$variant === "warning") return theme.colors["text-on-warning"];
+            return theme.colors["text-muted"];
+        }
+    };
+`;
+```
+
+</Step>
+
+<Step title="Add TypeScript types">
+
+Always use TypeScript for type safety. Extend existing component types when appropriate:
+
+```tsx
+import { type ComponentPropsWithRef } from "react";
+
+// For components that render as a specific HTML element
+interface BadgeProps extends ComponentPropsWithRef<"span"> {
+    variant?: "primary" | "warning" | "default";
+}
+
+// For components that wrap styled-components
+interface ButtonProps extends ComponentPropsWithRef<typeof BaseButton> {
+    asChild?: boolean;
+    variant?: "solid" | "primary";
+}
+```
+
+</Step>
+
+<Step title="Use the component">
+
+Import and use your new component:
+
+```tsx src/pages/example.tsx
+import { Badge } from "@/components/badge/Badge";
+
+export default function ExamplePage() {
+    return (
+        <>
+            <Badge variant="primary">New</Badge>
+            <Badge variant="warning">Beta</Badge>
+            <Badge>Default</Badge>
+        </>
+    );
+}
+```
+
+</Step>
+
+</Steps>
+
+## Styled-Components Patterns
+
+### Using the Theme
+
+Always use the theme for colors, breakpoints, and other design tokens:
+
+```tsx
+import styled from "styled-components";
+import theme from "@/theme";
+
+const StyledComponent = styled.div`
+    /* Colors */
+    background-color: ${theme.colors["solid"]};
+    color: ${theme.colors["text-primary"]};
+    
+    /* Shadows */
+    box-shadow: ${theme.shadows.medium};
+    
+    /* Border radius */
+    border-radius: ${theme.scalars.borderRadiusCard};
+    
+    /* Responsive breakpoints */
+    @media (max-width: ${theme.breakpoints.mobileMax}) {
+        padding: 8px;
+    }
+`;
+```
+
+### Transient Props
+
+Use `$` prefix for props that shouldn't be passed to the DOM:
+
+```tsx
+const Card = styled(Solid)<{
+    $hoverable?: boolean;
+    $color?: keyof Colors;
+}>`
+    display: block;
+    padding: 16px 24px;
+    
+    ${(props) => props.$hoverable && css`
+        cursor: pointer;
+        
+        ${withHover`
+            background-color: ${theme.colors["solid-on-card"]};
+        `}
+    `}
+    
+    &:before {
+        background-color: ${(props) => 
+            props.$color ? theme.colors[props.$color] : theme.colors["text-primary"]
+        };
+    }
+`;
+```
+
+See the Card component at `src/components/card/Card.ts:8`.
+
+### Hover States
+
+Use the `withHover` mixin for consistent hover interactions:
+
+```tsx
+import { withHover } from "@/styles/mixins";
+import theme from "@/theme";
+
+const SolidButton = styled(BaseButton)`
+    background-color: ${theme.colors["solid"]};
+    color: ${theme.colors["text-muted"]};
+
+    ${withHover`
+        color: ${theme.colors["text"]};
+    `}
+`;
+```
+
+Example from `src/components/button/Button.tsx:121`.
+
+### Nested Context
+
+Style components differently based on their parent:
+
+```tsx
+import { Solid } from "@/components/box/Solid";
+
+const SilentButton = styled(BaseButton)`
+    background-color: transparent;
+    color: ${theme.colors["text-muted"]};
+
+    ${withHover`
+        background-color: ${theme.colors["solid"]};
+    `}
+    
+    /* Different styling when inside a Solid component */
+    ${Solid} & {
+        ${withHover`
+            background-color: ${theme.colors["solid-on-card"]};
+        `}
+    }
+`;
+```
+
+Example from `src/components/button/Button.tsx:134`.
+
+## Real Example: Button Component
+
+Here's how the Button component is structured:
+
+```tsx src/components/button/Button.tsx
+import { type ComponentPropsWithRef } from "react";
+import styled from "styled-components";
+
+import { Solid } from "@/components/box/Solid";
+import { NestableSlot } from "@/components/utils/NestableSlot";
+import { withHover } from "@/styles/mixins";
+import theme from "@/theme";
+
+interface ButtonProps extends ComponentPropsWithRef<typeof BaseButton> {
+    asChild?: boolean;
+    variant?: "solid" | "primary" | "warning" | "silent";
+    isCircle?: boolean;
+    disabled?: boolean;
+}
+
+export function Button({
+    ref,
+    asChild,
+    children,
+    variant = "solid",
+    isCircle = false,
+    disabled = false,
+    title,
+    ...props
+}: ButtonProps) {
+    let Component;
+    if (variant === "solid") {
+        Component = SolidButton;
+    } else if (variant === "primary") {
+        Component = PrimaryButton;
+    } else if (variant === "warning") {
+        Component = WarningButton;
+    } else if (variant === "silent") {
+        Component = SilentButton;
+    } else {
+        throw new Error(`Unknown button variant "${variant}"!`);
+    }
+
+    return (
+        <Component
+            ref={ref}
+            as={asChild ? NestableSlot : "button"}
+            $isCircle={isCircle}
+            disabled={disabled}
+            title={title}
+            aria-label={title}
+            {...props}
+        >
+            {children}
+        </Component>
+    );
+}
+
+const BaseButton = styled.button<{ $isCircle?: boolean }>`
+    --gap: 0;
+    --focus-ring-color: ${theme.colors["text-primary"]};
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
+    pointer-events: ${(props) => props.disabled && "none"};
+
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1rem;
+
+    padding: ${(props) => (props.$isCircle ? "8px" : "8px 16px")};
+    border-radius: 999px;
+    gap: var(--gap, 0);
+    aspect-ratio: ${(props) => props.$isCircle && "1 / 1"};
+
+    opacity: ${(props) => props.disabled && "0.5"};
+    box-shadow: ${theme.shadows.low};
+    transition: background-color 250ms;
+
+    &:focus:focus-visible {
+        box-shadow: 0 0 0 2px var(--focus-ring-color);
+    }
+`;
+
+const PrimaryButton = styled(BaseButton)`
+    background-color: ${theme.colors["solid-primary"]};
+    color: ${theme.colors["text-on-primary"]};
+
+    ${withHover`
+        background-color: ${theme.colors["text-on-primary"]};
+        color: ${theme.colors["text-primary"]};
+    `}
+
+    &:focus:focus-visible {
+        background-color: ${theme.colors["text-on-primary"]};
+        color: ${theme.colors["text-primary"]};
+    }
+`;
+```
+
+See the full component at `src/components/button/Button.tsx:1`.
+
+## Component Organization
+
+### File Naming
+
+- Use PascalCase for component files: `Button.tsx`, `AnimeSummaryCard.tsx`
+- Use camelCase for utility files: `extractImages.ts`, `getSharedPageProps.ts`
+- Group related components in subdirectories
+
+### Export Pattern
+
+```tsx
+// Named export for the component
+export function Button({ ... }) { ... }
+
+// Styled components are typically not exported
+const StyledButton = styled.button` ... `;
+```
+
+### GraphQL Fragments
+
+Attach GraphQL fragments to components that need them:
+
+```tsx
+import gql from "graphql-tag";
+
+export function ThemeDetailCard({ theme }: Props) {
+    // Component implementation
+}
+
+ThemeDetailCard.fragments = {
+    theme: gql`
+        fragment ThemeDetailCardTheme on Theme {
+            slug
+            type
+            sequence
+            group {
+                slug
+                name
+            }
+        }
+    `,
+};
+```
+
+## Best Practices
+
+- Use TypeScript for all components
+- Prefix transient props with `$` to prevent DOM warnings
+- Use the theme for all colors, spacing, and breakpoints
+- Use `withHover` mixin for hover states
+- Keep components small and focused on a single responsibility
+- Use `ComponentPropsWithRef` to support ref forwarding
+- Add accessibility attributes (`aria-label`, `role`, etc.)
+- Test responsive behavior using theme breakpoints
+
+## Next Steps
+
+- Learn about [adding pages](/guides/adding-pages)
+- Understand [working with the API](/guides/working-with-api)
+- Read about [deployment](/guides/deployment)

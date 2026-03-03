@@ -1,0 +1,296 @@
+---
+title: useWatchHistory
+description: Hook for managing user's watch history with localStorage persistence
+---
+
+Tracks and manages the user's watch history of anime themes with automatic duplicate handling and size limits.
+
+## Import
+
+```typescript
+import useWatchHistory from "@/hooks/useWatchHistory";
+```
+
+## Type Definitions
+
+```typescript
+import type { ThemeSummaryCardThemeFragment } from "@/generated/graphql";
+
+interface WatchHistoryTheme extends ThemeSummaryCardThemeFragment {
+    id: number;
+}
+
+export type WatchHistory = Array<WatchHistoryTheme>;
+```
+
+## Usage
+
+```typescript
+const { history, addToHistory, clearHistory } = useWatchHistory();
+```
+
+## Return Value
+
+<ResponseField name="history" type="WatchHistory">
+  Array of watched themes ordered chronologically. Most recent items are at the end of the array.
+</ResponseField>
+
+<ResponseField name="addToHistory" type="(theme: WatchHistoryTheme) => void">
+  Adds a theme to the watch history. Automatically handles:
+  - Preventing consecutive duplicates
+  - Removing previous occurrences of the same theme
+  - Limiting history to 100 most recent entries
+</ResponseField>
+
+<ResponseField name="clearHistory" type="() => void">
+  Clears all watch history.
+</ResponseField>
+
+## Examples
+
+### Track Video Playback
+
+```typescript
+import { useEffect } from "react";
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function VideoPlayer({ theme }: { theme: WatchHistoryTheme }) {
+    const { addToHistory } = useWatchHistory();
+
+    useEffect(() => {
+        // Add to history when video starts playing
+        addToHistory(theme);
+    }, [theme, addToHistory]);
+
+    return (
+        <video src={theme.video?.link} controls />
+    );
+}
+```
+
+### Display Watch History
+
+```typescript
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function WatchHistoryPage() {
+    const { history, clearHistory } = useWatchHistory();
+
+    if (history.length === 0) {
+        return <div>No watch history yet</div>;
+    }
+
+    // Display most recent first
+    const recentHistory = [...history].reverse();
+
+    return (
+        <div>
+            <div className="header">
+                <h1>Watch History ({history.length})</h1>
+                <button onClick={clearHistory}>Clear History</button>
+            </div>
+            <ul>
+                {recentHistory.map((theme, index) => (
+                    <li key={`${theme.id}-${index}`}>
+                        <a href={`/anime/${theme.anime?.slug}`}>
+                            {theme.anime?.name} - {theme.song?.title}
+                        </a>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+```
+
+### Recent History Widget
+
+```typescript
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function RecentlyWatched({ limit = 5 }: { limit?: number }) {
+    const { history } = useWatchHistory();
+
+    // Get most recent items
+    const recentItems = history.slice(-limit).reverse();
+
+    if (recentItems.length === 0) {
+        return null;
+    }
+
+    return (
+        <section>
+            <h2>Recently Watched</h2>
+            <div className="recent-grid">
+                {recentItems.map((theme) => (
+                    <div key={theme.id} className="theme-card">
+                        <img src={theme.anime?.images?.[0]?.link} alt="" />
+                        <p>{theme.song?.title}</p>
+                    </div>
+                ))}
+            </div>
+        </section>
+    );
+}
+```
+
+### Continue Watching
+
+```typescript
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function ContinueWatching() {
+    const { history } = useWatchHistory();
+
+    // Get the most recent item
+    const lastWatched = history[history.length - 1];
+
+    if (!lastWatched) {
+        return null;
+    }
+
+    return (
+        <div className="continue-watching">
+            <h3>Continue Watching</h3>
+            <a href={`/anime/${lastWatched.anime?.slug}`}>
+                <img src={lastWatched.anime?.images?.[0]?.link} alt="" />
+                <div>
+                    <p>{lastWatched.anime?.name}</p>
+                    <span>{lastWatched.song?.title}</span>
+                </div>
+            </a>
+        </div>
+    );
+}
+```
+
+### History with Clear Confirmation
+
+```typescript
+import { useState } from "react";
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function HistoryManager() {
+    const { history, clearHistory } = useWatchHistory();
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    const handleClear = () => {
+        clearHistory();
+        setShowConfirm(false);
+    };
+
+    return (
+        <div>
+            <h2>Watch History</h2>
+            <p>{history.length} items</p>
+            
+            {!showConfirm ? (
+                <button onClick={() => setShowConfirm(true)}>
+                    Clear History
+                </button>
+            ) : (
+                <div>
+                    <p>Are you sure? This cannot be undone.</p>
+                    <button onClick={handleClear}>Yes, Clear</button>
+                    <button onClick={() => setShowConfirm(false)}>Cancel</button>
+                </div>
+            )}
+        </div>
+    );
+}
+```
+
+### Profile Statistics
+
+```typescript
+import useWatchHistory from "@/hooks/useWatchHistory";
+import useLocalPlaylist from "@/hooks/useLocalPlaylist";
+
+function ProfileStats() {
+    const { history } = useWatchHistory();
+    const { localPlaylist } = useLocalPlaylist();
+
+    const uniqueAnime = new Set(
+        history.map((theme) => theme.anime?.id).filter(Boolean)
+    ).size;
+
+    return (
+        <div className="stats">
+            <div className="stat">
+                <span className="value">{history.length}</span>
+                <span className="label">Themes Watched</span>
+            </div>
+            <div className="stat">
+                <span className="value">{uniqueAnime}</span>
+                <span className="label">Unique Anime</span>
+            </div>
+            <div className="stat">
+                <span className="value">{localPlaylist.length}</span>
+                <span className="label">Playlist Items</span>
+            </div>
+        </div>
+    );
+}
+```
+
+### Auto-track in Video Component
+
+```typescript
+import { useRef, useEffect } from "react";
+import useWatchHistory from "@/hooks/useWatchHistory";
+
+function VideoPlayerWithTracking({ theme, src }: {
+    theme: WatchHistoryTheme;
+    src: string;
+}) {
+    const { addToHistory } = useWatchHistory();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const hasTracked = useRef(false);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handleTimeUpdate = () => {
+            // Track after 10 seconds of playback
+            if (!hasTracked.current && video.currentTime > 10) {
+                addToHistory(theme);
+                hasTracked.current = true;
+            }
+        };
+
+        video.addEventListener("timeupdate", handleTimeUpdate);
+        return () => video.removeEventListener("timeupdate", handleTimeUpdate);
+    }, [theme, addToHistory]);
+
+    return <video ref={videoRef} src={src} controls />;
+}
+```
+
+## Implementation Details
+
+- Stores history in localStorage under the key `"history"`
+- Maximum history size: 100 entries (oldest removed when limit exceeded)
+- Prevents adding the same theme consecutively (if already the most recent)
+- Removes previous occurrences before adding to avoid duplicates
+- Most recent items are at the end of the array
+- Uses `useCallback` for `addToHistory` to maintain stable reference
+- Source: `/home/daytona/workspace/source/src/hooks/useWatchHistory.ts:13`
+
+## Storage Behavior
+
+### Duplicate Handling
+
+When adding a theme that already exists in history:
+1. Removes all previous occurrences
+2. Adds the theme to the end (most recent position)
+
+### Consecutive Duplicates
+
+If the theme being added is already the most recent item, it is not added again. This prevents cluttering the history when a user repeatedly watches the same video.
+
+### Size Management
+
+When the history exceeds 100 items:
+1. The oldest item (first in array) is removed
+2. The new item is added to the end

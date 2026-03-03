@@ -1,0 +1,467 @@
+---
+title: Pages Router
+description: Understanding the Next.js Pages Router structure and dynamic routing
+---
+
+## Overview
+
+AnimeThemes Web uses Next.js **Pages Router** (not App Router) for file-system based routing. Each file in the `src/pages` directory automatically becomes a route.
+
+## Page Structure
+
+### Root Pages
+
+<Accordion title="Homepage (index.tsx)">
+```typescript:src/pages/index.tsx
+export default function HomePage({ featuredTheme, announcementSources }: HomePageProps) {
+    const { me } = useAuth();
+    const { currentYear, currentSeason } = useCurrentSeason();
+
+    return (
+        <>
+            <SEO />
+            <Text variant="h1">Welcome, to AnimeThemes.moe!</Text>
+            {featuredTheme && (
+                <FeaturedTheme entry={featuredTheme.entry} video={featuredTheme.video} />
+            )}
+            {/* Navigation cards, recently added, etc. */}
+        </>
+    );
+}
+
+export const getStaticProps: GetStaticProps<HomePageProps> = async () => {
+    const { data, apiRequests } = await fetchData<HomePageQuery>(gql`
+        query HomePage {
+            featuredTheme { entry { ...FeaturedThemeEntry } }
+            announcementAll { content }
+        }
+    `);
+
+    return {
+        props: {
+            ...getSharedPageProps(apiRequests),
+            featuredTheme: data?.featuredTheme,
+            announcementSources: /* serialize markdown */,
+        },
+    };
+};
+```
+
+**Features:**
+- Static generation with featured theme
+- Announcement cards with MDX rendering
+- Quick navigation to search, shuffle, current season
+- Recently added videos and playlists
+</Accordion>
+
+### Application Wrapper
+
+```typescript:src/pages/_app.tsx
+export default function MyApp({ Component, pageProps }: AppProps) {
+    const [watchList, setWatchList] = useState<WatchListItem[]>([]);
+    const [colorTheme, setColorTheme] = useColorTheme();
+    
+    return (
+        <MultiContextProvider providers={[
+            stackContext(ThemeProvider, { theme }),
+            stackContext(ColorThemeContext.Provider, { value: { colorTheme, setColorTheme } }),
+            stackContext(PlayerContext.Provider, { value: { watchList, setWatchList, /* ... */ } }),
+            stackContext(QueryClientProvider, { client: queryClient }),
+            stackContext(ToastProvider, {}),
+        ]}>
+            <GlobalStyle />
+            <SEO />
+            <StyledWrapper>
+                <Navigation />
+                <Container>
+                    <Component {...pageProps} />
+                </Container>
+                <Footer />
+            </StyledWrapper>
+        </MultiContextProvider>
+    );
+}
+```
+
+## Dynamic Routes
+
+### Single Dynamic Segment
+
+<Tabs>
+  <Tab title="Anime Detail">
+    **Route:** `/anime/[animeSlug]`
+    
+    ```typescript:src/pages/anime/[animeSlug]/index.tsx
+    interface AnimeDetailPageParams extends ParsedUrlQuery {
+        animeSlug: string;
+    }
+
+    export default function AnimeDetailPage({ anime }: AnimeDetailPageProps) {
+        return (
+            <>
+                <SEO title={anime.name} image={largeCover} />
+                <Text variant="h1">{anime.name}</Text>
+                <SidebarContainer>
+                    <CoverImage resourceWithImages={anime} />
+                    <DescriptionList>
+                        <DescriptionList.Item title="Premiere">
+                            {anime.season} {anime.year}
+                        </DescriptionList.Item>
+                    </DescriptionList>
+                    <AnimeThemeFilter themes={anime.themes} />
+                </SidebarContainer>
+            </>
+        );
+    }
+
+    export const getStaticPaths: GetStaticPaths<AnimeDetailPageParams> = () => {
+        return fetchStaticPaths(async () => {
+            const { data } = await fetchData<AnimeDetailPageAllQuery>(gql`
+                query AnimeDetailPageAll {
+                    animeAll {
+                        ...AnimeDetailPageAnime
+                    }
+                }
+            `);
+
+            return data.animeAll.map((anime) => ({
+                params: { animeSlug: anime.slug },
+            }));
+        });
+    };
+
+    export const getStaticProps: GetStaticProps = async ({ params }) => {
+        const { data } = await fetchData<AnimeDetailPageQuery>(gql`
+            query AnimeDetailPage($animeSlug: String!) {
+                anime(slug: $animeSlug) {
+                    ...AnimeDetailPageAnime
+                }
+            }
+        `, params);
+
+        return {
+            props: { anime: data.anime },
+            revalidate: 3600, // 1 hour
+        };
+    };
+    ```
+    
+    **URL Example:** `/anime/cowboy-bebop`
+  </Tab>
+  
+  <Tab title="Artist Detail">
+    **Route:** `/artist/[artistSlug]`
+    
+    ```typescript:src/pages/artist/[artistSlug]/index.tsx
+    interface ArtistDetailPageParams extends ParsedUrlQuery {
+        artistSlug: string;
+    }
+
+    export default function ArtistDetailPage({ artist }: ArtistDetailPageProps) {
+        return (
+            <>
+                <SEO title={artist.name} />
+                <Text variant="h1">{artist.name}</Text>
+                <SidebarContainer>
+                    <CoverImage resourceWithImages={artist} />
+                    <DescriptionList>
+                        {artist.members?.length ? (
+                            <DescriptionList.Item title="Members">
+                                {artist.members.map(member => (
+                                    <Text key={member.slug}>{member.name}</Text>
+                                ))}
+                            </DescriptionList.Item>
+                        ) : null}
+                    </DescriptionList>
+                    {/* Performance list */}
+                </SidebarContainer>
+            </>
+        );
+    }
+    ```
+    
+    **URL Example:** `/artist/yoko-kanno`
+  </Tab>
+  
+  <Tab title="Studio Detail">
+    **Route:** `/studio/[studioSlug]`
+    
+    Similar pattern to anime and artist pages, displaying:
+    - Studio information
+    - List of anime produced
+    - External resources
+    
+    **URL Example:** `/studio/bones`
+  </Tab>
+</Tabs>
+
+### Nested Dynamic Routes
+
+<Accordion title="Video Detail Page">
+**Route:** `/anime/[animeSlug]/[videoSlug]`
+
+```typescript:src/pages/anime/[animeSlug]/[videoSlug]/index.tsx
+interface VideoDetailPageParams extends ParsedUrlQuery {
+    animeSlug: string;
+    videoSlug: string;
+}
+
+export interface VideoPageProps extends SharedPageProps {
+    anime: AnimeDetailPageAnime;
+    themeIndex: number;
+    entryIndex: number;
+    videoIndex: number;
+    isVideoPage: true;
+}
+
+export default function VideoDetailPage(props: VideoPageProps) {
+    const { anime, themeIndex, entryIndex, videoIndex } = props;
+    const theme = anime.themes[themeIndex];
+    const entry = theme.entries[entryIndex];
+    const video = entry.videos[videoIndex];
+
+    return (
+        <VideoPlayer
+            watchListItem={{ video, entry, theme }}
+            overlay={<VideoPlayerOverlay {...props} />}
+        >
+            {/* Video page content */}
+        </VideoPlayer>
+    );
+}
+
+export const getStaticPaths: GetStaticPaths = () => {
+    return fetchStaticPaths(async () => {
+        const { data } = await fetchData(/* fetch all anime */);
+        
+        const paths = [];
+        for (const anime of data.animeAll) {
+            for (const [themeIndex, theme] of anime.themes.entries()) {
+                for (const [entryIndex, entry] of theme.entries.entries()) {
+                    for (const [videoIndex, video] of entry.videos.entries()) {
+                        paths.push({
+                            params: {
+                                animeSlug: anime.slug,
+                                videoSlug: createVideoSlug(anime, theme, entry, video),
+                            },
+                        });
+                    }
+                }
+            }
+        }
+        
+        return paths;
+    });
+};
+```
+
+**URL Example:** `/anime/cowboy-bebop/OP-NCBD1080`
+
+**Video Slug Format:** `{type}{sequence?}-{tags}{resolution}`
+- Type: OP (opening), ED (ending)
+- Sequence: 1, 2, 3, etc. (optional)
+- Tags: NC (no credits), BD (Blu-ray), etc.
+- Resolution: 1080, 720, 480
+</Accordion>
+
+### Multi-Segment Catch-All Routes
+
+```typescript:src/pages/[...pageSlug]/index.tsx
+// Handles wiki and blog pages from MDX content
+interface PageParams extends ParsedUrlQuery {
+    pageSlug: string[];
+}
+
+export default function Page({ pageSlug, source }: PageProps) {
+    return (
+        <>
+            <SEO title={/* derive from slug */} />
+            <Markdown source={source} />
+        </>
+    );
+}
+
+export const getStaticPaths: GetStaticPaths = async () => {
+    const pages = await getAllPages();
+    
+    return {
+        paths: pages.map((page) => ({
+            params: { pageSlug: page.slug.split('/') },
+        })),
+        fallback: false,
+    };
+};
+```
+
+**URL Examples:**
+- `/wiki/installation`
+- `/blog/2024-annual-awards`
+
+## Static Path Generation
+
+The app uses a custom `fetchStaticPaths` utility to optimize build times:
+
+```typescript:src/utils/fetchStaticPaths.ts
+export default function fetchStaticPaths<T>(
+    fn: () => Promise<T>
+): GetStaticPathsResult<T> {
+    // During development, return empty paths for faster reloads
+    if (process.env.NODE_ENV === 'development') {
+        return {
+            paths: [],
+            fallback: 'blocking',
+        };
+    }
+    
+    // In production, generate all paths
+    const paths = await fn();
+    return {
+        paths,
+        fallback: false,
+    };
+}
+```
+
+## Incremental Static Regeneration (ISR)
+
+Pages are regenerated in the background based on the `revalidate` prop:
+
+<CardGroup cols={2}>
+  <Card title="1 Hour Revalidation" icon="clock">
+    Most content pages (anime, artists, studios)
+    ```typescript
+    return {
+        props: { /* ... */ },
+        revalidate: 3600,
+    };
+    ```
+  </Card>
+  
+  <Card title="No Revalidation" icon="lock">
+    Static content (wiki, blog)
+    ```typescript
+    return {
+        props: { /* ... */ },
+        // No revalidate = never regenerate
+    };
+    ```
+  </Card>
+</CardGroup>
+
+## Page Layout Modes
+
+Pages can specify layout variants via props:
+
+```typescript:src/pages/_app.tsx
+const { isVideoPage = false, isFullWidthPage = false } = pageProps;
+
+const Container = isFullWidthPage ? StyledFullWidthContainer : StyledContainer;
+
+return (
+    <StyledWrapper>
+        {!isFullWidthPage ? <Navigation /> : null}
+        {!isVideoPage ? (
+            <Container>
+                <Component {...pageProps} />
+            </Container>
+        ) : null}
+        {currentWatchListItem && (
+            <VideoPlayer
+                watchListItem={currentWatchListItem}
+                background={!isVideoPage}
+            >
+                {isVideoPage ? <Component {...pageProps} /> : null}
+            </VideoPlayer>
+        )}
+    </StyledWrapper>
+);
+```
+
+## Navigation Between Pages
+
+### Programmatic Navigation
+
+```typescript
+import { useRouter } from 'next/router';
+
+function SearchButton() {
+    const router = useRouter();
+    
+    const handleSearch = () => {
+        router.push('/search?q=cowboy+bebop');
+    };
+    
+    return <Button onClick={handleSearch}>Search</Button>;
+}
+```
+
+### Link Component
+
+```typescript
+import Link from 'next/link';
+
+function AnimeCard({ anime }) {
+    return (
+        <Link href={`/anime/${anime.slug}`}>
+            <Card>
+                <Text>{anime.name}</Text>
+            </Card>
+        </Link>
+    );
+}
+```
+
+## API Routes
+
+The `/api` directory contains serverless functions:
+
+```typescript:src/pages/api/graphql.ts
+import { schema } from '@/lib/server';
+
+export default async function handler(req, res) {
+    // Handle GraphQL requests from client
+    const result = await execute({
+        schema,
+        document: parse(req.body.query),
+        variableValues: req.body.variables,
+    });
+    
+    res.json(result);
+}
+```
+
+## Route Patterns Summary
+
+| Pattern | Example | Use Case |
+|---------|---------|----------|
+| `index.tsx` | `/` | Homepage |
+| `about.tsx` | `/about` | Static page |
+| `[slug].tsx` | `/anime/[animeSlug]` | Dynamic single segment |
+| `[slug]/[id].tsx` | `/anime/[animeSlug]/[videoSlug]` | Nested dynamic |
+| `[...slug].tsx` | `/wiki/[...pageSlug]` | Catch-all route |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use ISR for Content Pages" icon="sync">
+    Set appropriate revalidation times for content that changes periodically
+  </Card>
+  
+  <Card title="Build-Time Caching" icon="database">
+    Cache API responses during `getStaticPaths` to avoid redundant requests in `getStaticProps`
+  </Card>
+  
+  <Card title="Type Safety" icon="shield">
+    Define `ParsedUrlQuery` interfaces for all dynamic route params
+  </Card>
+  
+  <Card title="Shared Props Pattern" icon="share">
+    Use `getSharedPageProps()` to inject common data like build time and API request count
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<Card title="Next.js Pages Router Documentation" href="https://nextjs.org/docs/pages" icon="book">
+  Official Next.js documentation for the Pages Router
+</Card>

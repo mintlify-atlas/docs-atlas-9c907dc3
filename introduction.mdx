@@ -1,0 +1,219 @@
+---
+title: Introduction
+description: A Next.js web application for browsing anime opening and ending themes from the AnimeThemes database
+---
+
+# Welcome to AnimeThemes Web
+
+AnimeThemes Web is a modern, high-performance frontend application built with Next.js that provides a beautiful interface for browsing, searching, and watching anime opening and ending themes.
+
+<img
+  className="block"
+  src="https://animethemes.moe/apple-touch-icon.png"
+  alt="AnimeThemes Logo"
+/>
+
+## What is AnimeThemes Web?
+
+A simple and consistent repository of anime opening and ending themes. AnimeThemes Web provides high quality WebMs of your favorite OPs and EDs for your listening and discussion needs, all wrapped in a sleek, user-friendly interface.
+
+<CardGroup cols={2}>
+  <Card
+    title="Search & Discover"
+    icon="magnifying-glass"
+    href="#key-features"
+  >
+    Browse through a comprehensive database of anime themes with powerful search capabilities
+  </Card>
+  <Card
+    title="Video Playback"
+    icon="play"
+    href="#key-features"
+  >
+    Watch high-quality WebM videos with a custom-built video player
+  </Card>
+  <Card
+    title="Playlists"
+    icon="list"
+    href="#key-features"
+  >
+    Create and manage playlists of your favorite anime themes
+  </Card>
+  <Card
+    title="User Profiles"
+    icon="user"
+    href="#key-features"
+  >
+    Personalized profiles with watch history and custom galleries
+  </Card>
+</CardGroup>
+
+## Key Features
+
+AnimeThemes Web is packed with features designed to enhance your anime theme browsing experience:
+
+### 🎬 Advanced Video Player
+
+- Custom-built video player with fullscreen support
+- Auto-play and repeat functionality
+- Watch list management with queue support
+- iOS compatibility with webkit fullscreen
+- Background playback for seamless navigation
+
+### 🔍 Powerful Search & Navigation
+
+- Full-text search across anime, artists, series, and studios
+- Browse by year and season
+- Filter by theme type (OP/ED)
+- Shuffle feature for random discovery
+- Recently added and most popular sections
+
+### 🎨 Modern UI/UX
+
+- Built with styled-components for dynamic theming
+- Dark mode support with customizable color themes
+- Responsive design for mobile and desktop
+- Smooth animations powered by Motion
+- Radix UI components for accessibility
+
+### 📊 Rich Data
+
+- Comprehensive anime metadata
+- Artist and studio information
+- Series relationships
+- Multiple video qualities and formats
+- Featured themes and announcements
+
+### 🎵 Content Organization
+
+- Anime index with detailed pages
+- Artist profiles with discography
+- Year/Season browsing
+- Series and studio indexes
+- Event pages and anime awards
+
+### 👤 User Features
+
+- User authentication and profiles
+- Watch history tracking
+- Playlist creation and management
+- Gallery customization
+- Password reset functionality
+
+### 🚀 Performance Optimized
+
+- Static Site Generation (SSG) with incremental regeneration
+- Turbopack for faster builds and hot reload
+- GraphQL API with efficient data fetching
+- Client-side caching with React Query and SWR
+- Bundle analysis for optimization
+
+### 🛠️ Developer Experience
+
+- TypeScript for type safety
+- GraphQL code generation
+- ESLint and Prettier for code quality
+- Husky for git hooks
+- Comprehensive build configuration
+
+## Tech Stack
+
+AnimeThemes Web is built with cutting-edge technologies:
+
+<CardGroup cols={3}>
+  <Card title="Next.js 15" icon="react">
+    React framework with App Router and RSC support
+  </Card>
+  <Card title="TypeScript" icon="code">
+    Full type safety across the codebase
+  </Card>
+  <Card title="Styled Components" icon="palette">
+    CSS-in-JS with theming support
+  </Card>
+  <Card title="GraphQL" icon="diagram-project">
+    Efficient API queries with code generation
+  </Card>
+  <Card title="React Query" icon="database">
+    Powerful data synchronization
+  </Card>
+  <Card title="Radix UI" icon="puzzle-piece">
+    Accessible component primitives
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Set up your development environment and install dependencies
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration"
+  >
+    Configure environment variables and API endpoints
+  </Card>
+  <Card
+    title="Development"
+    icon="code"
+    href="/development"
+  >
+    Learn the development workflow and available scripts
+  </Card>
+  <Card
+    title="API Documentation"
+    icon="book"
+    href="https://api-docs.animethemes.moe/"
+  >
+    Explore the AnimeThemes API documentation
+  </Card>
+</CardGroup>
+
+## Open Source
+
+AnimeThemes Web is open source and welcomes contributions!
+
+- **GitHub Repository**: [AnimeThemes/animethemes-web](https://github.com/AnimeThemes/animethemes-web)
+- **GitHub Organization**: [AnimeThemes](https://github.com/AnimeThemes)
+- **Discord Community**: [Join our Discord](https://discordapp.com/invite/m9zbVyQ)
+
+<Note>
+  This project is actively being worked on. If you're a developer interested in contributing, feel free to contact us on Discord or submit a pull request on GitHub.
+</Note>
+
+## Project Structure
+
+The application follows Next.js best practices with a well-organized structure:
+
+```
+src/
+├── components/     # React components
+├── context/        # React contexts (player, auth, theme)
+├── hooks/          # Custom React hooks
+├── lib/            # API clients and utilities
+├── pages/          # Next.js pages and API routes
+├── styles/         # Global styles and mixins
+├── theme/          # Theme configuration
+└── utils/          # Utility functions
+```
+
+## What's Next?
+
+Explore the documentation to learn how to set up and customize AnimeThemes Web for your needs:
+
+<Steps>
+  <Step title="Install Dependencies">
+    Follow the [installation guide](/installation) to set up your development environment
+  </Step>
+  <Step title="Configure Environment">
+    Set up [environment variables](/configuration) for API access
+  </Step>
+  <Step title="Start Developing">
+    Learn the [development workflow](/development) and start building
+  </Step>
+</Steps>

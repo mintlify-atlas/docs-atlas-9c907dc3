@@ -1,0 +1,237 @@
+---
+title: GraphQL Queries
+description: Learn how to write GraphQL queries in AnimeThemes Web using the gql tag and fragments
+---
+
+AnimeThemes Web uses GraphQL for all data fetching operations, both server-side and client-side. The project uses GraphQL fragments for code reusability and the `gql` tagged template literal for query definition.
+
+## Query Structure
+
+GraphQL queries are written using the `gql` tag from `graphql-tag`:
+
+```tsx
+import gql from "graphql-tag";
+
+const query = gql`
+  query AnimeDetailPage($animeSlug: String!) {
+    anime(slug: $animeSlug) {
+      slug
+      name
+      year
+      season
+    }
+  }
+`;
+```
+
+## Using Fragments
+
+Fragments are defined on components and reused across queries to ensure consistency and avoid duplication.
+
+### Defining Fragments
+
+Components can define fragments as static properties:
+
+```tsx
+AnimeDetailPage.fragments = {
+  anime: gql`
+    ${extractImages.fragments.resourceWithImages}
+    ${ThemeDetailCard.fragments.theme}
+
+    fragment AnimeDetailPageAnime on Anime {
+      ...extractImagesResourceWithImages
+      slug
+      name
+      season
+      year
+      synopsis
+      media_format
+      synonyms {
+        text
+      }
+      series {
+        slug
+        name
+      }
+      themes {
+        ...ThemeDetailCardTheme
+      }
+    }
+  `,
+};
+```
+
+### Composing Fragments in Queries
+
+Fragments are composed into queries using template literal interpolation:
+
+```tsx
+const { data } = await fetchData<AnimeDetailPageQuery, AnimeDetailPageQueryVariables>(
+  gql`
+    ${AnimeDetailPage.fragments.anime}
+
+    query AnimeDetailPage($animeSlug: String!) {
+      anime(slug: $animeSlug) {
+        ...AnimeDetailPageAnime
+      }
+    }
+  `,
+  params,
+);
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:196-207`
+
+## The fetchData Function
+
+The `fetchData` function is the primary method for executing GraphQL queries on the server.
+
+### Server-Side Usage
+
+```tsx
+import { fetchData } from "@/lib/server";
+import type { HomePageQuery } from "@/generated/graphql";
+
+const { data, apiRequests } = await fetchData<HomePageQuery>(gql`
+  query HomePage {
+    featuredTheme {
+      entry {
+        id
+      }
+      video {
+        id
+      }
+    }
+    announcementAll {
+      content
+    }
+  }
+`);
+```
+
+Reference: `src/pages/index.tsx:226-243`
+
+### How It Works
+
+The `fetchData` function is built using `buildFetchData` from `@/lib/common`:
+
+```typescript
+import { buildFetchData } from "@/lib/common";
+import { schema } from "@/lib/server";
+
+export const fetchData = buildFetchData(schema);
+```
+
+Reference: `src/lib/server/index.ts:15`
+
+### Return Value
+
+The function returns an object with:
+- `data`: The query result data
+- `apiRequests`: Number of API requests made (for performance tracking)
+
+```typescript
+interface ApiExecutionResult<T> {
+  data: T;
+  apiRequests: number;
+}
+```
+
+Reference: `src/lib/common/index.ts:6-9`
+
+## Real Query Examples
+
+### Anime Detail Query
+
+```tsx
+const { data, apiRequests } = await fetchData<AnimeDetailPageQuery, AnimeDetailPageQueryVariables>(
+  gql`
+    ${AnimeDetailPage.fragments.anime}
+
+    query AnimeDetailPage($animeSlug: String!) {
+      anime(slug: $animeSlug) {
+        ...AnimeDetailPageAnime
+      }
+    }
+  `,
+  { animeSlug: params.animeSlug },
+);
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:196-207`
+
+### Artist Detail Query
+
+```tsx
+const { data, apiRequests } = await fetchData<ArtistDetailPageQuery, ArtistDetailPageQueryVariables>(
+  gql`
+    ${ArtistDetailPage.fragements.artist}
+
+    query ArtistDetailPage($artistSlug: String!) {
+      artist(slug: $artistSlug) {
+        ...ArtistDetailPageArtist
+      }
+    }
+  `,
+  params,
+);
+```
+
+Reference: `src/pages/artist/[artistSlug]/index.tsx:530-541`
+
+### List Query for Static Paths
+
+```tsx
+const { data } = await fetchData<AnimeDetailPageAllQuery>(gql`
+  ${AnimeDetailPage.fragments.anime}
+
+  query AnimeDetailPageAll {
+    animeAll {
+      ...AnimeDetailPageAnime
+    }
+  }
+`);
+```
+
+Reference: `src/pages/anime/[animeSlug]/index.tsx:231-239`
+
+## Query Includes Pattern
+
+The GraphQL API supports an "includes" pattern for fetching related data. This is handled by the resolvers and allows for efficient data fetching:
+
+```graphql
+query ArtistDetailPage($artistSlug: String!) {
+  artist(slug: $artistSlug) {
+    slug
+    name
+    performances {
+      song {
+        themes {
+          entries {
+            videos {
+              filename
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+The nested structure automatically includes related data through GraphQL's resolver chain.
+
+## Type Safety
+
+All queries are fully typed using generated TypeScript types from GraphQL Code Generator:
+
+```tsx
+import type { AnimeDetailPageQuery, AnimeDetailPageQueryVariables } from "@/generated/graphql";
+
+const { data } = await fetchData<AnimeDetailPageQuery, AnimeDetailPageQueryVariables>(
+  query,
+  variables,
+);
+```
+
+This provides complete type safety from query definition to data usage.

@@ -1,0 +1,270 @@
+---
+title: Adding Pages
+description: Step-by-step guide to creating new pages in AnimeThemes Web
+---
+
+This guide walks you through creating new pages in the AnimeThemes Web project using Next.js Pages Router.
+
+## Understanding the Pages Router
+
+AnimeThemes Web uses Next.js Pages Router, where files in the `src/pages/` directory automatically become routes:
+
+- `src/pages/index.tsx` → `/`
+- `src/pages/anime/index.tsx` → `/anime`
+- `src/pages/anime/[animeSlug]/index.tsx` → `/anime/:animeSlug`
+
+## Creating a Static Page
+
+<Steps>
+
+<Step title="Create the page file">
+
+Create a new file in `src/pages/`. For example, to add a `/about` page:
+
+```tsx src/pages/about/index.tsx
+import { Text } from "@/components/text/Text";
+import { SEO } from "@/components/seo/SEO";
+
+export default function AboutPage() {
+    return (
+        <>
+            <SEO title="About" />
+            <Text variant="h1">About AnimeThemes</Text>
+            <Text as="p">
+                A simple and consistent repository of anime opening and ending themes.
+            </Text>
+        </>
+    );
+}
+```
+
+</Step>
+
+<Step title="Add styled components if needed">
+
+Use styled-components for custom styling:
+
+```tsx src/pages/about/index.tsx
+import styled from "styled-components";
+import { Text } from "@/components/text/Text";
+import { SEO } from "@/components/seo/SEO";
+import theme from "@/theme";
+
+const Container = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    
+    @media (max-width: ${theme.breakpoints.mobileMax}) {
+        gap: 16px;
+    }
+`;
+
+export default function AboutPage() {
+    return (
+        <>
+            <SEO title="About" />
+            <Container>
+                <Text variant="h1">About AnimeThemes</Text>
+                <Text as="p">Content here...</Text>
+            </Container>
+        </>
+    );
+}
+```
+
+</Step>
+
+<Step title="Test your page">
+
+Run the development server and navigate to your new page:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000/about` to see your page.
+
+</Step>
+
+</Steps>
+
+## Creating a Dynamic Page
+
+Dynamic pages use brackets `[param]` in the filename to create routes with parameters.
+
+<Steps>
+
+<Step title="Create the dynamic route file">
+
+For example, to create `/artist/[artistSlug]`:
+
+```tsx src/pages/artist/[artistSlug]/index.tsx
+import type { GetStaticPaths, GetStaticProps } from "next";
+import type { ParsedUrlQuery } from "querystring";
+import gql from "graphql-tag";
+
+import { Text } from "@/components/text/Text";
+import { SEO } from "@/components/seo/SEO";
+import type { ArtistDetailPageQuery, ArtistDetailPageQueryVariables } from "@/generated/graphql";
+import { fetchData } from "@/lib/server";
+import getSharedPageProps from "@/utils/getSharedPageProps";
+import type { SharedPageProps } from "@/utils/getSharedPageProps";
+import type { RequiredNonNullable } from "@/utils/types";
+
+interface ArtistDetailPageProps extends SharedPageProps, RequiredNonNullable<ArtistDetailPageQuery> {}
+
+interface ArtistDetailPageParams extends ParsedUrlQuery {
+    artistSlug: string;
+}
+
+export default function ArtistDetailPage({ artist }: ArtistDetailPageProps) {
+    return (
+        <>
+            <SEO title={artist.name} />
+            <Text variant="h1">{artist.name}</Text>
+            <Text as="p">Artist details...</Text>
+        </>
+    );
+}
+```
+
+</Step>
+
+<Step title="Implement getStaticProps">
+
+Fetch data at build time using `getStaticProps`:
+
+```tsx src/pages/artist/[artistSlug]/index.tsx
+export const getStaticProps: GetStaticProps<ArtistDetailPageProps, ArtistDetailPageParams> = async ({ params }) => {
+    const { data, apiRequests } = await fetchData<ArtistDetailPageQuery, ArtistDetailPageQueryVariables>(
+        gql`
+            query ArtistDetailPage($artistSlug: String!) {
+                artist(slug: $artistSlug) {
+                    slug
+                    name
+                }
+            }
+        `,
+        params,
+    );
+
+    if (!data.artist) {
+        return {
+            notFound: true,
+        };
+    }
+
+    return {
+        props: {
+            ...getSharedPageProps(apiRequests),
+            artist: data.artist,
+        },
+        // Revalidate after 1 hour (= 3600 seconds)
+        revalidate: 3600,
+    };
+};
+```
+
+</Step>
+
+<Step title="Implement getStaticPaths">
+
+Generate paths at build time:
+
+```tsx src/pages/artist/[artistSlug]/index.tsx
+import fetchStaticPaths from "@/utils/fetchStaticPaths";
+
+export const getStaticPaths: GetStaticPaths<ArtistDetailPageParams> = () => {
+    return fetchStaticPaths(async () => {
+        const { data } = await fetchData<ArtistDetailPageAllQuery>(gql`
+            query ArtistDetailPageAll {
+                artistAll {
+                    slug
+                }
+            }
+        `);
+
+        return data.artistAll.map((artist) => ({
+            params: {
+                artistSlug: artist.slug,
+            },
+        }));
+    });
+};
+```
+
+</Step>
+
+</Steps>
+
+## Real Example: Anime Detail Page
+
+Here's how the anime detail page is structured in the actual codebase:
+
+```tsx src/pages/anime/[animeSlug]/index.tsx
+export default function AnimeDetailPage({ anime, synopsisMarkdownSource }: AnimeDetailPageProps) {
+    const [collapseSynopsis, setCollapseSynopsis] = useState(true);
+    const { largeCover } = extractImages(anime);
+
+    return (
+        <>
+            <SEO title={anime.name} image={largeCover} />
+            <Text variant="h1">{anime.name}</Text>
+            <SidebarContainer>
+                <Column style={{ "--gap": "24px" }}>
+                    <CoverImage resourceWithImages={anime} alt={`Cover image of ${anime.name}`} />
+                    <DescriptionList>
+                        <DescriptionList.Item title="Premiere">
+                            <Text
+                                as={Link}
+                                href={`/year/${anime.year}${anime.season ? `/${anime.season.toLowerCase()}` : ""}`}
+                                link
+                            >
+                                {(anime.season ? anime.season + " " : "") + anime.year}
+                            </Text>
+                        </DescriptionList.Item>
+                    </DescriptionList>
+                </Column>
+                <Column style={{ "--gap": "24px" }}>
+                    {!!synopsisMarkdownSource && (
+                        <>
+                            <Text variant="h2">Synopsis</Text>
+                            <Card $hoverable onClick={() => setCollapseSynopsis(!collapseSynopsis)}>
+                                <HeightTransition>
+                                    <Text as="div" maxLines={collapseSynopsis ? 2 : undefined}>
+                                        <Markdown source={synopsisMarkdownSource} />
+                                    </Text>
+                                </HeightTransition>
+                            </Card>
+                        </>
+                    )}
+                    <Text variant="h2">Themes</Text>
+                    {anime.themes?.length ? (
+                        <AnimeThemeFilter themes={anime.themes.map((theme) => ({ ...theme, anime }))} />
+                    ) : (
+                        <Text as="p">There are no themes for this anime, yet.</Text>
+                    )}
+                </Column>
+            </SidebarContainer>
+        </>
+    );
+}
+```
+
+This page is located at `src/pages/anime/[animeSlug]/index.tsx:54`.
+
+## Best Practices
+
+- Always include `<SEO />` component for proper meta tags
+- Use TypeScript interfaces for props and params
+- Return `notFound: true` when data doesn't exist
+- Add `revalidate` for Incremental Static Regeneration (ISR)
+- Use `getSharedPageProps()` to track API requests
+- Follow the existing component structure for consistency
+
+## Next Steps
+
+- Learn about [creating components](/guides/creating-components)
+- Understand [working with the API](/guides/working-with-api)
+- Read about [deployment](/guides/deployment)

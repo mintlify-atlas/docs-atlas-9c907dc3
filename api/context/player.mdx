@@ -1,0 +1,256 @@
+---
+title: PlayerContext
+description: React context for managing the video player state and watch list
+---
+
+## Overview
+
+The `PlayerContext` provides comprehensive state management for the video player, including watch list management, autoplay settings, and playback controls.
+
+## Type Definitions
+
+```typescript
+interface WatchListItem {
+    watchListId: number;
+    video: VideoSummaryCardVideoFragment;
+    entry: VideoSummaryCardEntryFragment;
+}
+
+interface PlayerContextInterface {
+    watchList: WatchListItem[];
+    setWatchList: (watchList: WatchListItem[], forceAutoPlay?: boolean) => void;
+    watchListFactory: (() => Promise<WatchListItem[]>) | null;
+    setWatchListFactory: (factory: (() => Promise<WatchListItem[]>) | null) => void;
+    currentWatchListItem: WatchListItem | null;
+    setCurrentWatchListItem: (watchListItem: WatchListItem | null) => void;
+    addWatchListItem: (video: VideoSummaryCardVideoFragment, entry: VideoSummaryCardEntryFragment) => void;
+    addWatchListItemNext: (video: VideoSummaryCardVideoFragment, entry: VideoSummaryCardEntryFragment) => void;
+    clearWatchList: () => void;
+    isGlobalAutoPlay: boolean;
+    setGlobalAutoPlay: (autoPlay: boolean) => void;
+    isLocalAutoPlay: boolean;
+    setLocalAutoPlay: (autoPlay: boolean) => void;
+    isWatchListUsingLocalAutoPlay: boolean;
+    isRepeat: boolean;
+    setRepeat: (repeat: boolean) => void;
+}
+```
+
+## Context Values
+
+<ResponseField name="watchList" type="WatchListItem[]" required>
+  Array of videos queued for playback.
+</ResponseField>
+
+<ResponseField name="setWatchList" type="(watchList: WatchListItem[], forceAutoPlay?: boolean) => void" required>
+  Updates the watch list. Optional `forceAutoPlay` parameter enables local autoplay for the new watch list.
+</ResponseField>
+
+<ResponseField name="watchListFactory" type="(() => Promise<WatchListItem[]>) | null" required>
+  Factory function for lazily loading additional watch list items.
+</ResponseField>
+
+<ResponseField name="setWatchListFactory" type="(factory: (() => Promise<WatchListItem[]>) | null) => void" required>
+  Sets or clears the watch list factory function.
+</ResponseField>
+
+<ResponseField name="currentWatchListItem" type="WatchListItem | null" required>
+  The currently playing video item, or `null` if no video is active.
+</ResponseField>
+
+<ResponseField name="setCurrentWatchListItem" type="(watchListItem: WatchListItem | null) => void" required>
+  Updates the currently playing video. Triggers factory loading when approaching end of watch list.
+</ResponseField>
+
+<ResponseField name="addWatchListItem" type="(video: VideoSummaryCardVideoFragment, entry: VideoSummaryCardEntryFragment) => void" required>
+  Adds a video to the end of the watch list.
+</ResponseField>
+
+<ResponseField name="addWatchListItemNext" type="(video: VideoSummaryCardVideoFragment, entry: VideoSummaryCardEntryFragment) => void" required>
+  Inserts a video immediately after the currently playing item.
+</ResponseField>
+
+<ResponseField name="clearWatchList" type="() => void" required>
+  Clears the watch list and resets playback state.
+</ResponseField>
+
+<ResponseField name="isGlobalAutoPlay" type="boolean" required>
+  Global autoplay setting persisted in localStorage.
+</ResponseField>
+
+<ResponseField name="setGlobalAutoPlay" type="(autoPlay: boolean) => void" required>
+  Updates the global autoplay preference.
+</ResponseField>
+
+<ResponseField name="isLocalAutoPlay" type="boolean" required>
+  Temporary autoplay state for the current watch list session.
+</ResponseField>
+
+<ResponseField name="setLocalAutoPlay" type="(autoPlay: boolean) => void" required>
+  Updates the local autoplay state.
+</ResponseField>
+
+<ResponseField name="isWatchListUsingLocalAutoPlay" type="boolean" required>
+  Indicates if the current watch list was created with local autoplay enabled.
+</ResponseField>
+
+<ResponseField name="isRepeat" type="boolean" required>
+  Whether repeat mode is enabled.
+</ResponseField>
+
+<ResponseField name="setRepeat" type="(repeat: boolean) => void" required>
+  Toggles repeat mode on or off.
+</ResponseField>
+
+## Provider Usage
+
+The `PlayerContext.Provider` is configured in `_app.tsx` with comprehensive state management:
+
+```typescript
+import PlayerContext, { createWatchListItem } from "@/context/playerContext";
+import type { WatchListItem } from "@/context/playerContext";
+
+function MyApp({ Component, pageProps }: AppProps) {
+    const [watchList, setWatchList] = useState<WatchListItem[]>([]);
+    const [currentWatchListItemId, setCurrentWatchListItemId] = useState<number | null>(null);
+    const currentWatchListItem = watchList.find(
+        (item) => item.watchListId === currentWatchListItemId
+    ) ?? null;
+
+    return (
+        <PlayerContext.Provider
+            value={{
+                watchList,
+                setWatchList,
+                currentWatchListItem,
+                setCurrentWatchListItem: (watchListItem) => {
+                    setCurrentWatchListItemId(watchListItem?.watchListId ?? null);
+                },
+                addWatchListItem: (video, entry) => {
+                    setWatchList((watchList) => [
+                        ...watchList,
+                        createWatchListItem(video, entry)
+                    ]);
+                },
+                clearWatchList: () => setWatchList([]),
+                // ... other values
+            }}
+        >
+            {/* App content */}
+        </PlayerContext.Provider>
+    );
+}
+```
+
+## Consumer Usage
+
+### Basic Usage
+
+```typescript
+import { useContext } from "react";
+import PlayerContext from "@/context/playerContext";
+
+function VideoControls() {
+    const { currentWatchListItem, setCurrentWatchListItem } = useContext(PlayerContext);
+
+    return (
+        <div>
+            {currentWatchListItem && (
+                <p>Now playing: {currentWatchListItem.video.filename}</p>
+            )}
+        </div>
+    );
+}
+```
+
+### Adding Videos to Watch List
+
+```typescript
+import { useContext } from "react";
+import PlayerContext from "@/context/playerContext";
+
+function VideoMenu({ video, entry }) {
+    const { addWatchListItem, addWatchListItemNext } = useContext(PlayerContext);
+
+    return (
+        <div>
+            <button onClick={() => addWatchListItem(video, entry)}>
+                Add to Queue
+            </button>
+            <button onClick={() => addWatchListItemNext(video, entry)}>
+                Play Next
+            </button>
+        </div>
+    );
+}
+```
+
+### Managing Autoplay
+
+```typescript
+import { useContext } from "react";
+import PlayerContext from "@/context/playerContext";
+
+function AutoplayToggle() {
+    const { isGlobalAutoPlay, setGlobalAutoPlay } = useContext(PlayerContext);
+
+    return (
+        <button onClick={() => setGlobalAutoPlay(!isGlobalAutoPlay)}>
+            Autoplay: {isGlobalAutoPlay ? "On" : "Off"}
+        </button>
+    );
+}
+```
+
+## Utility Functions
+
+### createWatchListItem
+
+Factory function to create watch list items with unique IDs:
+
+```typescript
+function createWatchListItem(
+    video: VideoSummaryCardVideoFragment,
+    entry: VideoSummaryCardEntryFragment
+): WatchListItem
+```
+
+**Example:**
+
+```typescript
+import { createWatchListItem } from "@/context/playerContext";
+
+const watchListItem = createWatchListItem(video, entry);
+setWatchList([watchListItem]);
+```
+
+## Real-World Usage Examples
+
+### In VideoPlayer Component
+
+See: [src/components/video-player/VideoPlayer.tsx:87](https://github.com/AnimeThemes/animethemes-web/blob/main/src/components/video-player/VideoPlayer.tsx#L87)
+
+```typescript
+const {
+    watchList,
+    currentWatchListItem,
+    setCurrentWatchListItem,
+    isGlobalAutoPlay,
+    isLocalAutoPlay,
+    isWatchListUsingLocalAutoPlay,
+    isRepeat,
+} = useContext(PlayerContext);
+```
+
+### In Playlist Page
+
+See: [src/pages/playlist/[playlistId]/index.tsx:186](https://github.com/AnimeThemes/animethemes-web/blob/main/src/pages/playlist/%5BplaylistId%5D/index.tsx#L186)
+
+```typescript
+const { setWatchList, setWatchListFactory, setCurrentWatchListItem } = 
+    useContext(PlayerContext);
+```
+
+## Source
+
+Source code: [src/context/playerContext.ts](https://github.com/AnimeThemes/animethemes-web/blob/main/src/context/playerContext.ts)

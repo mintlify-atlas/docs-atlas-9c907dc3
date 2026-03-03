@@ -1,0 +1,417 @@
+---
+title: Configuration
+description: Configure AnimeThemes Web with environment variables and build options
+---
+
+# Configuration
+
+AnimeThemes Web uses environment variables to configure API endpoints, build behavior, and feature flags. This guide covers all available configuration options.
+
+## Environment Files
+
+Next.js supports multiple environment files for different stages:
+
+- `.env.local` - Local development (not committed to git)
+- `.env.development` - Development environment
+- `.env.production` - Production environment
+- `.env` - Default for all environments
+
+<Note>
+  For local development, create a `.env.local` file in the root directory. This file is ignored by git and won't be committed to version control.
+</Note>
+
+## Minimal Setup
+
+The absolute minimum configuration requires only one environment variable:
+
+```ini .env.local
+# Set this to the URL on which your local API is served
+ANIMETHEMES_API_URL=http://localhost
+```
+
+<Warning>
+  If you don't have a local instance of animethemes-server set up, you can use the production URL `https://api.animethemes.moe`. However, this puts additional load on the AnimeThemes servers. It's **highly recommended** to set up your own API instance locally for development.
+</Warning>
+
+## Server-Side Variables
+
+These variables are only available on the server-side (during build and SSR):
+
+<ParamField path="ANIMETHEMES_API_URL" type="string" required>
+  The URL to the AnimeThemes API which will be used on the server.
+  
+  **Example:**
+  ```ini
+  ANIMETHEMES_API_URL=http://localhost
+  ```
+  
+  <Note>
+    This is required if `NEXT_PUBLIC_API_URL` is not set. At least one API URL must be configured.
+  </Note>
+</ParamField>
+
+<ParamField path="MINIMAL_BUILD" type="boolean" default="false">
+  Activate minimal build mode. In minimal build mode, only a small subset of pages get prerendered at build time, significantly reducing build time.
+  
+  **Example:**
+  ```ini
+  MINIMAL_BUILD=true
+  ```
+  
+  <Tip>
+    Use this during development to speed up builds. Disable for production deployments.
+  </Tip>
+</ParamField>
+
+<ParamField path="ANALYZE" type="boolean" default="false">
+  Activate the Next.js bundle analyzer. This generates an interactive treemap visualization of the bundle size.
+  
+  **Example:**
+  ```ini
+  ANALYZE=true
+  ```
+  
+  When enabled, run:
+  ```bash
+  npm run build
+  ```
+  
+  The analyzer will open in your browser after the build completes.
+</ParamField>
+
+<ParamField path="AUTH_REFERER" type="string">
+  Custom referer header for authentication requests.
+  
+  **Example:**
+  ```ini
+  AUTH_REFERER=https://animethemes.moe
+  ```
+</ParamField>
+
+## Client-Side Variables
+
+These variables are exposed to the browser (prefixed with `NEXT_PUBLIC_`):
+
+<ParamField path="NEXT_PUBLIC_API_URL" type="string" required>
+  The URL to the AnimeThemes API which will be used in the browser.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+  ```
+  
+  <Warning>
+    This is highly recommended even if you set `ANIMETHEMES_API_URL`. Without it, API requests from the client-side won't work.
+  </Warning>
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_VIDEO_URL" type="string">
+  The URL from which video files should be served.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+  ```
+  
+  <Warning>
+    Without this, videos won't play. This is required for video playback functionality.
+  </Warning>
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_AUDIO_URL" type="string">
+  The URL from which audio files should be served.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+  ```
+  
+  <Warning>
+    Without this, audio files won't play.
+  </Warning>
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_AUTH_PATH" type="string" default="/auth">
+  The path to use for authentication API requests. It will be appended to `NEXT_PUBLIC_API_URL`.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_AUTH_PATH=/auth
+  ```
+  
+  <Note>
+    This is fine to leave unset for development, but should be configured in production.
+  </Note>
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_BASE_PATH" type="string" default="">
+  The base path the app should be hosted on. Useful if deploying to a subdirectory.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_BASE_PATH=/wiki
+  ```
+  
+  This would make the app available at `https://example.com/wiki` instead of `https://example.com`.
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_STAGING" type="boolean" default="false">
+  Activate staging mode. In staging mode, a warning banner is displayed at the top of the page indicating this is a test environment.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_STAGING=true
+  ```
+  
+  When enabled, users will see a prominent warning that they're on a staging site.
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_VERBOSE_LOGS" type="boolean" default="false">
+  Enable verbose logging for debugging purposes.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_VERBOSE_LOGS=true
+  ```
+  
+  <Tip>
+    Useful during development to see detailed logs, but should be disabled in production.
+  </Tip>
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_PAGINATION_PAGE_SIZE" type="number" default="25">
+  Set the page size to fetch when resolving paginated resources.
+  
+  **Example:**
+  ```ini
+  NEXT_PUBLIC_PAGINATION_PAGE_SIZE=10
+  ```
+  
+  <Note>
+    If not set, the default value of 25 will be used.
+  </Note>
+</ParamField>
+
+## Complete Configuration Example
+
+Here's a complete `.env.local` file with all available options:
+
+```ini .env.local
+# ===== Server-side =====
+
+# The URL to the AnimeThemes API which will be used on the server.
+ANIMETHEMES_API_URL=http://localhost
+
+# Set to any truthy value to activate minimal build mode.
+# In minimal build mode, only a small subset of pages get prerendered at build time.
+MINIMAL_BUILD=true
+
+# Set to any truthy value to activate the bundle analyzer.
+ANALYZE=false
+
+# Custom referer for authentication requests
+AUTH_REFERER=https://animethemes.moe
+
+# ===== Server-side + Client-side =====
+
+# The base path the app should be hosted on.
+NEXT_PUBLIC_BASE_PATH=/wiki
+
+# The URL to the AnimeThemes API which will be used on the browser.
+NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+
+# The URL from which video files should be served.
+NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+
+# The URL from which audio files should be served.
+NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+
+# The path to use for authentication API requests. It will be appended to NEXT_PUBLIC_API_URL.
+NEXT_PUBLIC_AUTH_PATH=/auth
+
+# Set to any truthy value to activate staging mode.
+# In staging mode a warning banner is displayed at the top of the page.
+NEXT_PUBLIC_STAGING=false
+
+# To enable verbose logging.
+NEXT_PUBLIC_VERBOSE_LOGS=true
+
+# Set the page size to fetch when resolving paginated resources.
+# If not set, 25 will be used.
+NEXT_PUBLIC_PAGINATION_PAGE_SIZE=25
+```
+
+## Configuration Validation
+
+AnimeThemes Web validates your configuration on startup. The validation checks:
+
+<Steps>
+  <Step title="Required Variables">
+    At least one of `ANIMETHEMES_API_URL` or `NEXT_PUBLIC_API_URL` must be set.
+    
+    If neither is set, the application will **exit with an error**.
+  </Step>
+  
+  <Step title="Recommended Variables">
+    The following variables trigger **warnings** if not set:
+    
+    - `NEXT_PUBLIC_API_URL` (if only `ANIMETHEMES_API_URL` is set)
+    - `NEXT_PUBLIC_VIDEO_URL` (videos won't play)
+    - `NEXT_PUBLIC_AUDIO_URL` (audio won't play)
+    - `NEXT_PUBLIC_AUTH_PATH` (in production only)
+  </Step>
+</Steps>
+
+Validation happens in `src/utils/config.ts:28`.
+
+## TypeScript Configuration
+
+The project uses TypeScript with strict mode enabled. Key settings:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "target": "es2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "strict": true,
+    "jsx": "preserve"
+  }
+}
+```
+
+<Note>
+  The `@/*` path alias resolves to the `src` directory, allowing clean imports like `@/components/Button`.
+</Note>
+
+## Next.js Configuration
+
+The project uses a TypeScript-based Next.js config (`next.config.ts`) with these key settings:
+
+### Base Path
+
+Configured via `NEXT_PUBLIC_BASE_PATH` environment variable. Useful for subdirectory deployments.
+
+### Styled Components
+
+Server-side rendering for styled-components is enabled:
+
+```typescript
+compiler: {
+  styledComponents: true,
+}
+```
+
+### Security Headers
+
+The following security headers are automatically added:
+
+- `X-DNS-Prefetch-Control: on`
+- `Strict-Transport-Security`
+- `X-XSS-Protection`
+- `X-Frame-Options: SAMEORIGIN`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: origin-when-cross-origin`
+
+### Static Generation Timeout
+
+Set to 3600 seconds (1 hour) for complex page generation:
+
+```typescript
+staticPageGenerationTimeout: 3600
+```
+
+### URL Redirects
+
+Automatic redirects are configured:
+
+- `/wiki/blog/:slug*` → `/blog/:slug*`
+- `/wiki/status/:slug*` → `/blog/status_:slug*`
+
+## Common Configuration Scenarios
+
+<AccordionGroup>
+  <Accordion title="Local Development">
+    ```ini .env.local
+    # Use local API
+    ANIMETHEMES_API_URL=http://localhost:8000
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+    NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+    
+    # Speed up builds
+    MINIMAL_BUILD=true
+    
+    # Enable verbose logging
+    NEXT_PUBLIC_VERBOSE_LOGS=true
+    ```
+  </Accordion>
+  
+  <Accordion title="Production Deployment">
+    ```ini .env.production
+    # Use production API
+    ANIMETHEMES_API_URL=https://api.animethemes.moe
+    NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+    NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+    NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+    NEXT_PUBLIC_AUTH_PATH=/auth
+    
+    # Full build
+    MINIMAL_BUILD=false
+    
+    # Disable verbose logging
+    NEXT_PUBLIC_VERBOSE_LOGS=false
+    ```
+  </Accordion>
+  
+  <Accordion title="Staging Environment">
+    ```ini .env.staging
+    ANIMETHEMES_API_URL=https://staging-api.animethemes.moe
+    NEXT_PUBLIC_API_URL=https://staging-api.animethemes.moe
+    NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+    NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+    NEXT_PUBLIC_AUTH_PATH=/auth
+    
+    # Show staging banner
+    NEXT_PUBLIC_STAGING=true
+    
+    # Enable verbose logging for debugging
+    NEXT_PUBLIC_VERBOSE_LOGS=true
+    ```
+  </Accordion>
+  
+  <Accordion title="Subdirectory Deployment">
+    ```ini .env.production
+    # Deploy to /wiki subdirectory
+    NEXT_PUBLIC_BASE_PATH=/wiki
+    
+    NEXT_PUBLIC_API_URL=https://api.animethemes.moe
+    NEXT_PUBLIC_VIDEO_URL=https://v.animethemes.moe
+    NEXT_PUBLIC_AUDIO_URL=https://a.animethemes.moe
+    ```
+    
+    The app will be accessible at `https://yourdomain.com/wiki`.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Development"
+    icon="code"
+    href="/development"
+  >
+    Learn about the development workflow and available commands
+  </Card>
+  <Card
+    title="Next.js Environment Variables"
+    icon="book"
+    href="https://nextjs.org/docs/basic-features/environment-variables"
+  >
+    Read the official Next.js documentation on environment variables
+  </Card>
+</CardGroup>

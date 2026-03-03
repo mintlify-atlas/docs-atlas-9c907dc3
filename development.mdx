@@ -1,94 +1,361 @@
 ---
-title: 'Development'
-description: 'Preview changes locally to update your docs'
+title: Development
+description: Development workflow and tools for AnimeThemes Web
 ---
 
-<Info>
-  **Prerequisites**:
-  - Node.js version 19 or higher
-  - A docs repository with a `docs.json` file
-</Info>
+Set up your development environment and learn the workflow for contributing to AnimeThemes Web.
 
-Follow these steps to install and run Mintlify on your operating system.
+## Prerequisites
 
-<Steps>
-<Step title="Install the Mintlify CLI">
+Before you begin development, ensure you have:
+
+- Node.js v18 or higher (v24 recommended)
+- npm, yarn, or pnpm package manager
+- Git for version control
+- A local instance of the AnimeThemes API (recommended) or access to the production API
+
+## Development Server
+
+### Starting the Dev Server
+
+Run the development server with hot reload:
+
+<CodeGroup>
+```bash npm
+npm run dev
+```
+
+```bash yarn
+yarn dev
+```
+
+```bash pnpm
+pnpm dev
+```
+</CodeGroup>
+
+The application will be available at `http://localhost:3000`.
+
+### Turbopack
+
+The development server uses [Turbopack](https://turbo.build/pack), Next.js's next-generation bundler:
+
+- ⚡ **Faster startup** - Significantly faster than Webpack
+- 🔄 **Instant HMR** - Hot module replacement happens almost instantly
+- 🎯 **Optimized builds** - Efficient bundling and tree-shaking
+
+<Note>
+Turbopack is enabled by default via the `--turbopack` flag in the dev script. It provides a much faster development experience than the traditional Webpack bundler.
+</Note>
+
+## Available Scripts
+
+<ParamField path="dev" type="string">
+  Starts the Next.js development server with Turbopack and hot reload on port 3000.
+  
+  ```bash
+  npm run dev
+  ```
+</ParamField>
+
+<ParamField path="build" type="string">
+  Builds the application for production, generating static pages and optimized bundles.
+  
+  ```bash
+  npm run build
+  ```
+</ParamField>
+
+<ParamField path="start" type="string">
+  Starts the production server. Requires running `npm run build` first.
+  
+  ```bash
+  npm run start
+  ```
+</ParamField>
+
+<ParamField path="lint" type="string">
+  Runs ESLint to check for code quality issues.
+  
+  ```bash
+  npm run lint
+  ```
+</ParamField>
+
+<ParamField path="type-check" type="string">
+  Runs TypeScript compiler in check mode to verify types without emitting files.
+  
+  ```bash
+  npm run type-check
+  ```
+</ParamField>
+
+<ParamField path="graphql-codegen" type="string">
+  Generates TypeScript types from GraphQL schema and queries.
+  
+  ```bash
+  npm run graphql-codegen
+  ```
+</ParamField>
+
+<ParamField path="compile-config" type="string">
+  Compiles the TypeScript Next.js config to JavaScript. Runs automatically before dev/build/start.
+  
+  ```bash
+  npm run compile-config
+  ```
+</ParamField>
+
+## Project Structure
+
+```
+animethemes-web/
+├── public/              # Static assets (images, icons, etc.)
+├── src/
+│   ├── components/      # React components
+│   ├── context/         # React context providers
+│   ├── generated/       # Generated GraphQL types
+│   ├── hooks/           # Custom React hooks
+│   ├── lib/             # Library code and utilities
+│   │   ├── client/      # Client-side utilities
+│   │   ├── common/      # Shared utilities
+│   │   └── server/      # Server-side utilities
+│   ├── pages/           # Next.js pages (routing)
+│   ├── styles/          # Global styles
+│   ├── theme/           # Theme configuration
+│   └── utils/           # Utility functions
+├── next.config.ts       # Next.js configuration
+├── tsconfig.json        # TypeScript configuration
+└── package.json         # Dependencies and scripts
+```
+
+## Path Aliases
+
+TypeScript path aliases are configured for cleaner imports:
+
+```typescript
+import { Button } from "@/components/button/Button";
+import { fetchData } from "@/lib/server";
+import theme from "@/theme";
+import { API_URL } from "@/utils/config";
+```
+
+The `@/` alias maps to the `src/` directory.
+
+## Styling with styled-components
+
+Components use styled-components for CSS-in-JS:
+
+```typescript
+import styled from "styled-components";
+
+const Button = styled.button`
+  padding: 8px 16px;
+  background: ${(props) => props.theme.colors["solid-primary"]};
+  color: ${(props) => props.theme.colors["text-on-primary"]};
+  border-radius: 4px;
+
+  &:hover {
+    opacity: 0.9;
+  }
+`;
+```
+
+See the [Styling](/styling/styled-components) documentation for more details.
+
+## GraphQL Development
+
+### Generating Types
+
+After modifying GraphQL queries or schemas, regenerate TypeScript types:
 
 ```bash
-npm i -g mint
+npm run graphql-codegen
 ```
-</Step>
 
-<Step title="Preview locally">
+This reads:
+- `src/lib/common/animethemes/type-defs.ts` - AnimeThemes API schema
+- `src/lib/server/animebracket/type-defs.ts` - AnimeBracket schema
+- All `.ts` and `.tsx` files with GraphQL queries
 
-Navigate to your docs directory where your `docs.json` file is located, and run the following command:
+And generates:
+- `src/generated/graphql.ts` - TypeScript types for queries
+- `src/generated/graphql-resolvers.ts` - TypeScript types for resolvers
+
+### Writing Queries
+
+Use the `gql` template tag for type-safe queries:
+
+```typescript
+import gql from "graphql-tag";
+
+const ANIME_QUERY = gql`
+  query AnimeDetail($slug: String!) {
+    anime(slug: $slug) {
+      name
+      year
+      season
+      themes {
+        slug
+        type
+      }
+    }
+  }
+`;
+```
+
+## Git Workflow
+
+### Branch Naming
+
+Use descriptive branch names:
+- `feature/add-playlist-export`
+- `fix/video-player-controls`
+- `refactor/theme-context`
+
+### Commit Messages
+
+Follow conventional commit format:
 
 ```bash
-mint dev
+git commit -m "feat: add playlist export functionality"
+git commit -m "fix: resolve video player control z-index issue"
+git commit -m "refactor: extract theme logic to custom hook"
 ```
 
-A local preview of your documentation will be available at `http://localhost:3000`.
+### Pre-commit Hooks
 
-</Step>
-</Steps>
+Husky runs checks before each commit:
+- Linting via ESLint
+- Type checking via TypeScript
+- Code formatting via Prettier
 
-## Custom ports
+## Debugging
 
-By default, Mintlify uses port 3000. You can customize the port Mintlify runs on by using the `--port` flag. For example, to run Mintlify on port 3333, use this command:
+### Browser DevTools
+
+Use React DevTools for component inspection and the browser console for debugging.
+
+### VS Code Debugging
+
+Create `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Next.js: debug server-side",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 9229,
+      "console": "integratedTerminal"
+    }
+  ]
+}
+```
+
+### Verbose Logging
+
+Enable verbose logs via environment variable:
 
 ```bash
-mint dev --port 3333
+NEXT_PUBLIC_VERBOSE_LOGS=true npm run dev
 ```
 
-If you attempt to run Mintlify on a port that's already in use, it will use the next available port:
+## Performance Optimization
 
-```md
-Port 3000 is already in use. Trying 3001 instead.
+### Build Time Caching
+
+The project uses build-time caching to speed up static generation:
+
+```typescript next.config.ts
+experimental: {
+  // Single-threaded builds enable caching between pages
+  workerThreads: false,
+  cpus: 1,
+}
 ```
 
-## Mintlify versions
+### Bundle Analysis
 
-Please note that each CLI release is associated with a specific version of Mintlify. If your local preview does not align with the production version, please update the CLI:
+Analyze the bundle size:
 
 ```bash
-npm mint update
+ANALYZE=true npm run build
 ```
 
-## Validating links
+This opens an interactive treemap showing bundle composition.
 
-The CLI can assist with validating links in your documentation. To identify any broken links, use the following command:
-
-```bash
-mint broken-links
-```
-
-## Deployment
-
-If the deployment is successful, you should see the following:
-
-<Frame>
-  <img src="/images/checks-passed.png" alt="Screenshot of a deployment confirmation message that says All checks have passed." style={{ borderRadius: '0.5rem' }} />
-</Frame>
-
-## Code formatting
-
-We suggest using extensions on your IDE to recognize and format MDX. If you're a VSCode user, consider the [MDX VSCode extension](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) for syntax highlighting, and [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting.
-
-## Troubleshooting
+## Common Development Tasks
 
 <AccordionGroup>
-  <Accordion title='Error: Could not load the "sharp" module using the darwin-arm64 runtime'>
-
-    This may be due to an outdated version of node. Try the following:
-    1. Remove the currently-installed version of the CLI: `npm remove -g mint`
-    2. Upgrade to Node v19 or higher.
-    3. Reinstall the CLI: `npm i -g mint`
+  <Accordion title="Adding a new page">
+    1. Create a file in `src/pages/` (e.g., `src/pages/about.tsx`)
+    2. Implement `getStaticProps` for data fetching
+    3. Add the page to navigation if needed
+    
+    See [Adding Pages](/guides/adding-pages) for details.
   </Accordion>
 
-  <Accordion title="Issue: Encountering an unknown error">
-  
-    Solution: Go to the root of your device and delete the `~/.mintlify` folder. Then run `mint dev` again.
+  <Accordion title="Creating a new component">
+    1. Create a directory in `src/components/` (e.g., `src/components/my-component/`)
+    2. Add component file and styled components
+    3. Export from the component directory
+    
+    See [Creating Components](/guides/creating-components) for details.
+  </Accordion>
+
+  <Accordion title="Adding a GraphQL query">
+    1. Define the query with `gql` tag
+    2. Use `fetchData` in `getStaticProps`
+    3. Run `npm run graphql-codegen` to generate types
+    
+    See [Working with API](/guides/working-with-api) for details.
+  </Accordion>
+
+  <Accordion title="Changing theme colors">
+    1. Update `src/theme/colors/index.ts`
+    2. Restart the dev server
+    3. Test both light and dark modes
+    
+    See [Theming](/styling/theming) for details.
   </Accordion>
 </AccordionGroup>
 
-Curious about what changed in the latest CLI version? Check out the [CLI changelog](https://www.npmjs.com/package/mintlify?activeTab=versions).
+## Testing
+
+Run type checking to catch TypeScript errors:
+
+```bash
+npm run type-check
+```
+
+Run linting to check code quality:
+
+```bash
+npm run lint
+```
+
+<Tip>
+Set up your IDE to run ESLint and TypeScript checking automatically for immediate feedback while coding.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Add a Page" icon="file-plus" href="/guides/adding-pages">
+    Learn how to create new pages
+  </Card>
+  <Card title="Create Components" icon="cube" href="/guides/creating-components">
+    Build reusable React components
+  </Card>
+  <Card title="Work with API" icon="code" href="/guides/working-with-api">
+    Fetch data from the AnimeThemes API
+  </Card>
+  <Card title="Deploy" icon="rocket" href="/guides/deployment">
+    Deploy your changes to production
+  </Card>
+</CardGroup>

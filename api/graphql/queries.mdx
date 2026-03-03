@@ -1,0 +1,523 @@
+---
+title: GraphQL Queries
+description: Learn how to query data from the AnimeThemes GraphQL API
+---
+
+## Overview
+
+The AnimeThemes Web application uses GraphQL to fetch data from the AnimeThemes API. This page documents the available queries and how to use them in your pages.
+
+## Root Queries
+
+The GraphQL schema provides several root queries for fetching different types of resources:
+
+### Anime Queries
+
+#### `anime`
+
+Fetch a single anime by ID or slug.
+
+```graphql
+query AnimeDetailPage($animeSlug: String!) {
+  anime(slug: $animeSlug) {
+    id
+    name
+    slug
+    year
+    season
+    synopsis
+    media_format
+  }
+}
+```
+
+**Parameters:**
+- `id` (Int): The anime ID
+- `slug` (String): The anime slug
+
+#### `animeAll`
+
+Fetch a list of anime with optional filters.
+
+```graphql
+query AnimeIndex {
+  animeAll(limit: 25, year: 2024, season: "Winter") {
+    id
+    name
+    slug
+    year
+    season
+  }
+}
+```
+
+**Parameters:**
+- `limit` (Int): Maximum number of results
+- `year` (Int): Filter by year
+- `season` (String): Filter by season (Winter, Spring, Summer, Fall)
+
+### Theme Queries
+
+#### `theme`
+
+Fetch a single theme by ID.
+
+```graphql
+query ThemeDetail($id: Int!) {
+  theme(id: $id) {
+    id
+    type
+    sequence
+    song {
+      title
+    }
+  }
+}
+```
+
+#### `themeAll`
+
+Fetch a list of themes with sorting and filtering.
+
+```graphql
+query ThemeIndex {
+  themeAll(
+    limit: 25
+    orderBy: "created_at"
+    orderDesc: true
+    has: "animethemeentry.videos"
+  ) {
+    id
+    type
+    sequence
+  }
+}
+```
+
+**Parameters:**
+- `limit` (Int): Maximum number of results
+- `orderBy` (String): Field to sort by
+- `orderDesc` (Boolean): Sort in descending order
+- `has` (String): Filter by relationship existence
+
+### Artist Queries
+
+#### `artist`
+
+Fetch a single artist by ID or slug.
+
+```graphql
+query ArtistDetailPage($artistSlug: String!) {
+  artist(slug: $artistSlug) {
+    id
+    name
+    slug
+    information
+    performances {
+      alias
+      as
+      song {
+        title
+      }
+    }
+  }
+}
+```
+
+#### `artistAll`
+
+Fetch a list of artists.
+
+```graphql
+query ArtistIndex {
+  artistAll(limit: 25) {
+    id
+    name
+    slug
+  }
+}
+```
+
+### Other Resource Queries
+
+#### `series` / `seriesAll`
+
+Query anime series.
+
+```graphql
+query SeriesDetail($slug: String!) {
+  series(slug: $slug) {
+    id
+    name
+    slug
+    anime {
+      name
+      slug
+    }
+  }
+}
+```
+
+#### `studio` / `studioAll`
+
+Query animation studios.
+
+```graphql
+query StudioDetail($slug: String!) {
+  studio(slug: $slug) {
+    id
+    name
+    slug
+    anime {
+      name
+      slug
+    }
+  }
+}
+```
+
+#### `year` / `yearAll`
+
+Query by year and season.
+
+```graphql
+query YearDetail($value: Int!) {
+  year(value: $value) {
+    value
+    seasons {
+      value
+      anime {
+        name
+        slug
+      }
+    }
+  }
+}
+```
+
+### Special Queries
+
+#### `featuredTheme`
+
+Get the currently featured theme.
+
+```graphql
+query HomePage {
+  featuredTheme {
+    entry {
+      id
+      version
+    }
+    video {
+      filename
+      link
+    }
+  }
+}
+```
+
+#### `playlist` / `playlistAll`
+
+Query user playlists.
+
+```graphql
+query PlaylistDetail($id: String!) {
+  playlist(id: $id) {
+    id
+    name
+    description
+    visibility
+    tracks_count
+  }
+}
+```
+
+#### `me`
+
+Query the authenticated user's data.
+
+```graphql
+query UserProfile {
+  me {
+    user {
+      id
+      name
+      email
+    }
+    playlistAll {
+      id
+      name
+      visibility
+    }
+  }
+}
+```
+
+## Using Includes
+
+The GraphQL API uses a concept of "includes" to fetch related data. When you query a field that requires related data, the resolver automatically constructs the appropriate API request with includes.
+
+For example, to fetch an anime with its themes:
+
+```graphql
+query AnimeWithThemes($slug: String!) {
+  anime(slug: $slug) {
+    name
+    themes {
+      type
+      sequence
+      song {
+        title
+      }
+      entries {
+        videos {
+          filename
+          link
+        }
+      }
+    }
+  }
+}
+```
+
+The resolver will automatically add `include[anime]=animethemes.song.animethemeentries.videos` to the API request.
+
+## Real-World Examples
+
+### Homepage Query
+
+From `/src/pages/index.tsx`:
+
+```graphql
+query HomePage {
+  featuredTheme {
+    entry {
+      id
+      version
+      episodes
+      nsfw
+      spoiler
+      theme {
+        id
+        type
+        sequence
+        anime {
+          name
+          slug
+        }
+      }
+    }
+    video {
+      filename
+      link
+      resolution
+      nc
+      subbed
+      lyrics
+      tags
+    }
+  }
+  announcementAll {
+    content
+  }
+}
+```
+
+### Anime Detail Query
+
+From `/src/pages/anime/[animeSlug]/index.tsx`:
+
+```graphql
+query AnimeDetailPage($animeSlug: String!) {
+  anime(slug: $animeSlug) {
+    slug
+    name
+    season
+    year
+    synopsis
+    media_format
+    synonyms {
+      text
+    }
+    series {
+      slug
+      name
+    }
+    studios {
+      slug
+      name
+    }
+    resources {
+      site
+      link
+      as
+    }
+    themes {
+      id
+      type
+      sequence
+      song {
+        title
+      }
+      entries {
+        version
+        episodes
+        videos {
+          filename
+          link
+          basename
+        }
+      }
+    }
+    images {
+      link
+      facet
+    }
+  }
+}
+```
+
+### Artist Detail Query
+
+From `/src/pages/artist/[artistSlug]/index.tsx`:
+
+```graphql
+query ArtistDetailPage($artistSlug: String!) {
+  artist(slug: $artistSlug) {
+    slug
+    name
+    information
+    performances {
+      alias
+      as
+      song {
+        id
+        title
+        themes {
+          id
+          type
+          sequence
+          anime {
+            slug
+            name
+            year
+            season
+          }
+          entries {
+            videos {
+              filename
+              link
+            }
+          }
+        }
+      }
+    }
+    members {
+      member {
+        slug
+        name
+      }
+      alias
+      as
+      notes
+    }
+    groups {
+      group {
+        slug
+        name
+      }
+      alias
+      as
+      notes
+    }
+    resources {
+      link
+      site
+      as
+    }
+    images {
+      link
+      facet
+    }
+  }
+}
+```
+
+## Using GraphQL in Pages
+
+In Next.js pages, queries are used with the `fetchData` function:
+
+```typescript
+import gql from 'graphql-tag';
+import { fetchData } from '@/lib/server';
+
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  const { data, apiRequests } = await fetchData<QueryType, VariablesType>(
+    gql`
+      query MyQuery($slug: String!) {
+        anime(slug: $slug) {
+          name
+        }
+      }
+    `,
+    params
+  );
+
+  return {
+    props: {
+      anime: data.anime,
+    },
+    revalidate: 3600, // Revalidate after 1 hour
+  };
+};
+```
+
+## Query Fragments
+
+Fragments help reuse common query patterns:
+
+```graphql
+fragment ThemeDetails on Theme {
+  id
+  type
+  sequence
+  song {
+    title
+  }
+  entries {
+    version
+    videos {
+      filename
+      link
+    }
+  }
+}
+
+query AnimeWithThemes($slug: String!) {
+  anime(slug: $slug) {
+    name
+    themes {
+      ...ThemeDetails
+    }
+  }
+}
+```
+
+Fragments are typically defined on components:
+
+```typescript
+MyComponent.fragments = {
+  theme: gql`
+    fragment MyComponentTheme on Theme {
+      id
+      type
+      sequence
+    }
+  `,
+};
+```
+
+## Next Steps
+
+- [GraphQL Types](/api/graphql/types) - Learn about the available types and their fields
+- [GraphQL Resolvers](/api/graphql/resolvers) - Understand how resolvers fetch data from the API

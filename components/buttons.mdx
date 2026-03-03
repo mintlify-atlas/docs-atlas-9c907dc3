@@ -1,0 +1,233 @@
+---
+title: Button Components
+description: Button components and variants for user interactions
+---
+
+Button components provide consistent, accessible interactive elements.
+
+## Button
+
+The base button component with multiple variants.
+
+### Usage
+
+```tsx
+import { Button } from "@/components/button/Button";
+
+<Button variant="primary" isCircle={false}>
+  Click Me
+</Button>
+```
+
+### Props
+
+<ParamField path="variant" type="'solid' | 'primary' | 'warning' | 'silent'" default="solid">
+  Button style variant:
+  - `solid`: Default gray button
+  - `primary`: Primary action button with theme color
+  - `warning`: Warning/destructive action button
+  - `silent`: Transparent button, visible on hover
+</ParamField>
+
+<ParamField path="isCircle" type="boolean" default="false">
+  Renders button as a circle (1:1 aspect ratio)
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables button interactions
+</ParamField>
+
+<ParamField path="asChild" type="boolean">
+  Uses Radix UI Slot pattern to render child as button element
+</ParamField>
+
+<ParamField path="title" type="string">
+  Button title (also used as aria-label)
+</ParamField>
+
+### Variants
+
+#### Primary Button
+
+From `/src/components/button/Button.tsx:89`:
+
+```tsx
+<Button variant="primary">
+  Save Changes
+</Button>
+```
+
+Styles:
+- Background: `theme.colors["solid-primary"]`
+- Text: `theme.colors["text-on-primary"]`
+- Hover: Inverted colors
+
+#### Warning Button
+
+From `/src/components/button/Button.tsx:104`:
+
+```tsx
+<Button variant="warning">
+  Delete
+</Button>
+```
+
+Styles:
+- Background: `theme.colors["solid-warning"]`
+- Text: `theme.colors["text-on-warning"]`
+- Focus ring: `theme.colors["text-warning"]`
+
+#### Silent Button
+
+From `/src/components/button/Button.tsx:134`:
+
+```tsx
+<Button variant="silent">
+  Cancel
+</Button>
+```
+
+Styles:
+- Background: Transparent
+- Hover: Solid background appears
+- No shadow when not hovered
+
+### Circular Buttons
+
+```tsx
+<Button variant="primary" isCircle={true}>
+  <Icon icon={faPlay} />
+</Button>
+```
+
+Circular buttons have equal padding and 1:1 aspect ratio.
+
+### As Child Pattern
+
+```tsx
+<Button asChild variant="primary">
+  <Link href="/profile">View Profile</Link>
+</Button>
+```
+
+The `asChild` prop renders the child element with button styles.
+
+### Source
+
+Defined in `/src/components/button/Button.tsx:16`
+
+## IconTextButton
+
+A button combining an icon with optional text, with responsive collapsing.
+
+### Usage
+
+```tsx
+import { IconTextButton } from "@/components/button/IconTextButton";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+
+<IconTextButton 
+  icon={faMagnifyingGlass}
+  variant="silent"
+  collapsible={true}
+>
+  Search
+</IconTextButton>
+```
+
+### Props
+
+<ParamField path="icon" type="IconDefinition | ReactNode" required>
+  FontAwesome icon or custom React node
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  Button text (hidden on mobile if `collapsible` is enabled)
+</ParamField>
+
+<ParamField path="collapsible" type="true | keyof typeof theme.breakpoints">
+  Breakpoint at which to hide text and show only icon:
+  - `true`: Uses `theme.breakpoints.mobileMax`
+  - `"mobileMax"`: 720px
+  - `"tabletMax"`: 1024px
+  - `"socialListMax"`: 850px
+</ParamField>
+
+### Example from Navigation
+
+From `/src/components/navigation/Navigation.tsx:56`:
+
+```tsx
+<IconTextButton
+  asChild
+  icon={faMagnifyingGlass}
+  variant="silent"
+  collapsible
+  style={{ "--gap": "8px" }}
+>
+  <Link href="/search">Search</Link>
+</IconTextButton>
+```
+
+### Example from VideoPlayerBar
+
+From `/src/components/video-player/VideoPlayerBar.tsx:186`:
+
+```tsx
+<IconTextButton 
+  icon={faPlus} 
+  variant="solid" 
+  collapsible="socialListMax"
+>
+  Add to Playlist
+</IconTextButton>
+```
+
+### Responsive Behavior
+
+The button automatically becomes circular and hides text below the specified breakpoint:
+
+```tsx
+// Desktop: [🔍 Search]
+// Mobile:  [🔍]
+<IconTextButton icon={faMagnifyingGlass} collapsible={true}>
+  Search
+</IconTextButton>
+```
+
+### Source
+
+Defined in `/src/components/button/IconTextButton.tsx:37`
+
+## VideoButton
+
+A specialized button for playing videos (not shown in detail here, but available in `/src/components/button/VideoButton.tsx`).
+
+## BackToTopButton
+
+A button that scrolls to the top of the page (available in `/src/components/button/BackToTopButton.tsx`).
+
+## FilterToggleButton
+
+A button for toggling filters (available in `/src/components/button/FilterToggleButton.tsx`).
+
+## Button Composition
+
+Buttons can be nested within other components:
+
+```tsx
+<Card>
+  <Row style={{ "--gap": "8px" }}>
+    <Button variant="primary">Edit</Button>
+    <Button variant="warning">Delete</Button>
+  </Row>
+</Card>
+```
+
+## Accessibility
+
+All buttons include:
+- `aria-label` from `title` prop
+- Focus visible states
+- Keyboard navigation support
+- Disabled state styling

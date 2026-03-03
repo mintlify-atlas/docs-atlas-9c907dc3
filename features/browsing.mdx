@@ -1,0 +1,192 @@
+---
+title: Browsing
+description: Explore anime, artists, series, and studios with powerful filtering and sorting
+---
+
+AnimeThemes Web provides a rich browsing experience with card-based UI and advanced filtering options. You can explore content by anime, artists, series, studios, and years with intuitive sorting and search capabilities.
+
+## Browsing Anime
+
+The anime index provides alphabetical browsing and advanced search with multiple filters.
+
+<Steps>
+  <Step title="Navigate to Anime Index">
+    Visit `/anime` to see the alphabetical index of all anime in the database.
+  </Step>
+  
+  <Step title="Use Search Filters">
+    Apply filters to narrow down results:
+    - **First Letter**: Filter by starting character
+    - **Season**: Spring, Summer, Fall, Winter
+    - **Year**: Filter by release year
+    - **Media Format**: TV, Movie, OVA, ONA, Special
+  </Step>
+  
+  <Step title="Sort Results">
+    Choose from multiple sorting options:
+    - A → Z or Z → A (alphabetical)
+    - Old → New or New → Old (by premiere date)
+    - Last Added (most recently added to database)
+    - Relevance (when searching)
+  </Step>
+</Steps>
+
+### Anime Summary Cards
+
+Each anime is displayed in a card showing:
+- Cover image
+- Anime title
+- Media format (TV, Movie, etc.)
+- Premiere season and year
+- Number of themes
+
+<Note>
+  Clicking on an anime card navigates to its detail page at `/anime/[slug]`
+</Note>
+
+### Expandable Theme Lists
+
+In search results, anime cards can be expanded to show all themes inline:
+
+```typescript
+// From AnimeSummaryCard.tsx
+function AnimeSummaryCard({ anime, expandable = false }) {
+  const [isExpanded, toggleExpanded] = useToggle();
+  
+  return (
+    <SummaryCard
+      title={anime.name}
+      onClick={handleToggleExpand}
+    >
+      {expandable && (
+        <Collapse collapse={!isExpanded}>
+          <ThemeTable themes={anime.themes} />
+        </Collapse>
+      )}
+    </SummaryCard>
+  );
+}
+```
+
+## Browsing by Entity Type
+
+AnimeThemes Web supports browsing multiple entity types:
+
+<CardGroup cols={2}>
+  <Card title="Anime" icon="tv">
+    Browse all anime series with filtering by season, year, and format
+  </Card>
+  
+  <Card title="Artists" icon="microphone">
+    Discover artists who performed theme songs
+  </Card>
+  
+  <Card title="Series" icon="list">
+    Explore anime grouped by series (e.g., "Monogatari Series")
+  </Card>
+  
+  <Card title="Studios" icon="building">
+    Browse anime by production studio
+  </Card>
+</CardGroup>
+
+## Search Filters
+
+The search system provides entity-specific filters:
+
+### Available Filters
+
+```typescript
+// From SearchAnime.tsx
+const initialFilter = {
+  firstLetter: null,
+  season: null,
+  year: null,
+  mediaFormat: null,
+  sortBy: "name",
+};
+```
+
+<Tip>
+  Filters are preserved in local storage, so your preferences persist across sessions
+</Tip>
+
+### Filter Components
+
+The codebase includes specialized filter components:
+- `SearchFilterFirstLetter` - A-Z filtering
+- `SearchFilterSeason` - Seasonal filtering
+- `SearchFilterYear` - Year range selection
+- `SearchFilterMediaFormat` - TV/Movie/OVA/etc.
+- `SearchFilterSortBy` - Sorting options
+
+## Alphabetical Index
+
+Many pages use an alphabetical index for efficient navigation:
+
+```typescript
+// From pages/anime/index.tsx
+export default function AnimeIndexPage({ animeAll }) {
+  return (
+    <>
+      <Text variant="h1">Anime Index</Text>
+      <AlphabeticalIndex items={animeAll}>
+        {(anime) => (
+          <Text as={Link} href={`/anime/${anime.slug}`} block link>
+            {anime.name}
+          </Text>
+        )}
+      </AlphabeticalIndex>
+    </>
+  );
+}
+```
+
+## Card-Based UI
+
+All browsing interfaces use consistent card layouts:
+
+### Summary Card Pattern
+
+The `SummaryCard` component is the foundation:
+- **Image**: Anime/artist cover
+- **Title**: Entity name
+- **Description**: Metadata (format, year, count)
+- **Link**: Navigation to detail page
+
+### Hover Effects
+
+Cards reveal additional actions on hover:
+- Expand/collapse button for theme lists
+- Context menu for actions
+- Visual feedback
+
+<Note>
+  On mobile, expand buttons are always visible since hover isn't available
+</Note>
+
+## Year and Season Browsing
+
+Navigate anime by premiere date:
+
+- `/year` - All years index
+- `/year/[year]` - Anime from specific year
+- `/year/[year]/[season]` - Anime from specific season
+
+Seasons include: Winter, Spring, Summer, Fall
+
+## Studio and Series Browsing
+
+Explore related content:
+
+### Studios
+- `/studio` - All studios index
+- `/studio/[slug]` - Anime by studio
+
+### Series
+- `/series` - All series index  
+- `/series/[slug]` - Anime in series
+
+<Tip>
+  Use series pages to watch related anime in chronological order
+</Tip>

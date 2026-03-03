@@ -1,0 +1,294 @@
+---
+title: useAuth
+description: Authentication hook for managing user authentication state and operations
+---
+
+A comprehensive authentication hook that provides user authentication state and methods for login, registration, password management, and logout.
+
+## Import
+
+```typescript
+import useAuth from "@/hooks/useAuth";
+```
+
+## Type Definitions
+
+```typescript
+export interface RegisterErrors {
+    name?: Array<string>;
+    email?: Array<string>;
+    password?: Array<string>;
+}
+
+export interface LoginErrors {
+    email?: Array<string>;
+}
+
+interface RegisterProps {
+    setErrors: (errors: RegisterErrors) => void;
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+    terms: boolean;
+}
+
+interface LoginProps {
+    setErrors: (errors: LoginErrors) => void;
+    email: string;
+    password: string;
+    remember: boolean;
+}
+
+interface ForgotPasswordProps {
+    email: string;
+}
+
+interface ResetPasswordProps {
+    email: string;
+    password: string;
+    password_confirmation: string;
+    token: string;
+}
+```
+
+## Usage
+
+```typescript
+const {
+    me,
+    register,
+    login,
+    forgotPassword,
+    resetPassword,
+    resendEmailVerification,
+    logout,
+} = useAuth();
+```
+
+## Return Value
+
+<ResponseField name="me" type="object">
+  The current authenticated user object fetched from the API. Contains user details, permissions, and roles. Returns `{ user: null }` when not authenticated.
+  
+  <Expandable title="properties">
+    <ResponseField name="user" type="object | null">
+      <Expandable title="properties">
+        <ResponseField name="id" type="number">
+          User ID
+        </ResponseField>
+        <ResponseField name="name" type="string">
+          User's display name
+        </ResponseField>
+        <ResponseField name="email" type="string">
+          User's email address
+        </ResponseField>
+        <ResponseField name="permissions" type="array">
+          User's direct permissions
+        </ResponseField>
+        <ResponseField name="roles" type="array">
+          User's roles with associated permissions
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="register" type="(props: RegisterProps) => Promise<void>">
+  Registers a new user account. Handles CSRF protection and validation errors.
+</ResponseField>
+
+<ResponseField name="login" type="(props: LoginProps) => Promise<void>">
+  Authenticates a user with email and password. Supports remember me functionality.
+</ResponseField>
+
+<ResponseField name="forgotPassword" type="(props: ForgotPasswordProps) => Promise<AxiosResponse>">
+  Initiates the forgot password flow by sending a password reset email.
+</ResponseField>
+
+<ResponseField name="resetPassword" type="(props: ResetPasswordProps) => Promise<void>">
+  Resets the user's password using a reset token.
+</ResponseField>
+
+<ResponseField name="resendEmailVerification" type="() => Promise<void>">
+  Resends the email verification notification.
+</ResponseField>
+
+<ResponseField name="logout" type="() => Promise<void>">
+  Logs out the current user and invalidates the session.
+</ResponseField>
+
+## Examples
+
+### Checking Authentication Status
+
+```typescript
+import useAuth from "@/hooks/useAuth";
+
+function Navigation() {
+    const { me } = useAuth();
+
+    return (
+        <nav>
+            {me?.user ? (
+                <span>Welcome, {me.user.name}!</span>
+            ) : (
+                <button>Login</button>
+            )}
+        </nav>
+    );
+}
+```
+
+### Login Form
+
+```typescript
+import { useState, type SyntheticEvent } from "react";
+import useAuth, { type LoginErrors } from "@/hooks/useAuth";
+
+function LoginForm() {
+    const { login } = useAuth();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [isRemember, setRemember] = useState(false);
+    const [isBusy, setBusy] = useState(false);
+    const [errors, setErrors] = useState<LoginErrors>({});
+
+    function performLogin(event: SyntheticEvent) {
+        event.preventDefault();
+        setBusy(true);
+
+        login({
+            setErrors,
+            email,
+            password,
+            remember: isRemember,
+        }).finally(() => setBusy(false));
+    }
+
+    return (
+        <form onSubmit={performLogin}>
+            <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+            />
+            {errors.email && <span>{errors.email[0]}</span>}
+            <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+            />
+            <label>
+                <input
+                    type="checkbox"
+                    checked={isRemember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                />
+                Remember me
+            </label>
+            <button type="submit" disabled={isBusy}>
+                Login
+            </button>
+        </form>
+    );
+}
+```
+
+### User Registration
+
+```typescript
+import { useState } from "react";
+import useAuth, { type RegisterErrors } from "@/hooks/useAuth";
+
+function RegisterForm() {
+    const { register } = useAuth();
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [passwordConfirmation, setPasswordConfirmation] = useState("");
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [errors, setErrors] = useState<RegisterErrors>({});
+
+    async function handleRegister() {
+        await register({
+            setErrors,
+            name,
+            email,
+            password,
+            password_confirmation: passwordConfirmation,
+            terms: termsAccepted,
+        });
+    }
+
+    return (
+        <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }}>
+            <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+            />
+            {errors.name && <span>{errors.name[0]}</span>}
+            
+            <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+            />
+            {errors.email && <span>{errors.email[0]}</span>}
+            
+            <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+            />
+            {errors.password && <span>{errors.password[0]}</span>}
+            
+            <input
+                type="password"
+                value={passwordConfirmation}
+                onChange={(e) => setPasswordConfirmation(e.target.value)}
+                placeholder="Confirm Password"
+            />
+            
+            <label>
+                <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                />
+                I accept the terms and conditions
+            </label>
+            
+            <button type="submit">Register</button>
+        </form>
+    );
+}
+```
+
+### Logout
+
+```typescript
+import useAuth from "@/hooks/useAuth";
+
+function LogoutButton() {
+    const { logout } = useAuth();
+
+    return (
+        <button onClick={() => logout()}>
+            Logout
+        </button>
+    );
+}
+```
+
+## Implementation Details
+
+- Uses SWR for data fetching and caching with a 2-second deduping interval
+- Automatically handles CSRF token management for Laravel Sanctum
+- Revalidates authentication state globally after login/logout operations
+- Provides fallback data for server-side rendering
+- Uses GraphQL for fetching user data
+- Source: `/home/daytona/workspace/source/src/hooks/useAuth.ts:46`

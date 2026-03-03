@@ -1,0 +1,362 @@
+---
+title: Client-Side Data Fetching
+description: Using TanStack Query and SWR for client-side data fetching in AnimeThemes Web
+---
+
+AnimeThemes Web uses two primary libraries for client-side data fetching: **TanStack Query** (React Query) for general queries and **SWR** for authentication and real-time data.
+
+## TanStack Query (React Query)
+
+TanStack Query is the primary client-side data fetching solution, used for search, dynamic content, and user interactions.
+
+### Setup
+
+The QueryClient is configured in `_app.tsx`:
+
+```tsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const queryClient = new QueryClient();
+
+function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* ... */}
+    </QueryClientProvider>
+  );
+}
+```
+
+Reference: `src/pages/_app.tsx:49`
+
+### Basic Usage
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+import { fetchDataClient } from "@/lib/client";
+import gql from "graphql-tag";
+
+const { data: recentlyAdded } = useQuery<HomePageRecentlyAddedQuery["videoAll"]>({
+  queryKey: ["HomePageRecentlyAdded"],
+  queryFn: async () => {
+    const { data } = await fetchDataClient<HomePageRecentlyAddedQuery>(gql`
+      query HomePageRecentlyAdded {
+        videoAll(orderBy: "id", orderDesc: true, limit: 10) {
+          id
+          filename
+          entries {
+            id
+          }
+        }
+      }
+    `);
+
+    return data.videoAll;
+  },
+  placeholderData: range(10).map(() => null),
+});
+```
+
+Reference: `src/components/home/RecentlyAddedVideos.tsx:16-36`
+
+### Search with Previous Data
+
+For search interfaces, use `keepPreviousData` to prevent UI flicker:
+
+```tsx
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+
+const { data, error, isLoading, isError } = useQuery({
+  queryKey: ["searchGlobal", searchQuery],
+  queryFn: fetchSearchResults,
+  placeholderData: keepPreviousData,
+});
+```
+
+Reference: `src/components/search/SearchGlobal.tsx:69-73`
+
+### Query Keys
+
+Query keys are used for caching and invalidation:
+
+```tsx
+// Simple key
+queryKey: ["HomePageRecentlyAdded"]
+
+// With parameters
+queryKey: ["searchGlobal", searchQuery]
+
+// Complex key
+queryKey: ["PlaylistTrackAddFormPlaylist", "/api/me/playlist", video.id]
+```
+
+## SWR (Stale-While-Revalidate)
+
+SWR is used for authentication state and data that needs automatic revalidation.
+
+### Authentication Hook
+
+```tsx
+import useSWR, { mutate as mutateGlobal } from "swr";
+import { fetchDataClient } from "@/lib/client";
+import gql from "graphql-tag";
+
+const { data: me } = useSWR(
+  "/api/me",
+  async () => {
+    const { data } = await fetchDataClient<CheckAuthQuery>(gql`
+      query CheckAuth {
+        me {
+          user {
+            id
+            name
+            email
+            permissions {
+              name
+            }
+            roles {
+              permissions {
+                name
+              }
+            }
+          }
+        }
+      }
+    `);
+
+    return data.me;
+  },
+  { fallbackData: { user: null }, dedupingInterval: 2000 },
+);
+```
+
+Reference: `src/hooks/useAuth.ts:47-73`
+
+### Global Mutation
+
+SWR's global mutate is used to refresh data across all hooks:
+
+```tsx
+import { mutate as mutateGlobal } from "swr";
+
+const login = async ({ setErrors, ...props }: LoginProps) => {
+  await csrf();
+  setErrors({});
+
+  await axios
+    .post(`${AUTH_PATH}/login`, props)
+    .then(() => mutateGlobal(() => true)) // Revalidate all SWR hooks
+    .catch((error) => {
+      if (error.response.status !== 422) {
+        throw error;
+      }
+      setErrors(error.response.data.errors);
+    });
+};
+```
+
+Reference: `src/hooks/useAuth.ts:94-109`
+
+### Local Mutation
+
+For updating specific data:
+
+```tsx
+import useSWR, { mutate } from "swr";
+
+const { data: playlist, mutate } = useSWR(
+  playlistId ? `PlaylistPage${playlistId}` : null,
+  async () => {
+    // fetch data
+  },
+);
+
+// Later, update this specific data
+await mutate();
+```
+
+## The fetchDataClient Function
+
+Both TanStack Query and SWR use `fetchDataClient` for GraphQL queries:
+
+```typescript
+import type { ASTNode } from "graphql";
+import type { ApiExecutionResult } from "@/lib/common";
+
+export async function fetchDataClient<T, P extends Record<string, unknown>>(
+  query: string | ASTNode,
+  args?: P,
+  context?: { apiRequests?: number },
+  root?: Record<string, unknown>,
+): Promise<ApiExecutionResult<T>> {
+  // Code-split anything GraphQL related to reduce initial bundle size.
+  const { fetchDataClient } = await import("lib/client/chunk");
+
+  if (!args) {
+    return fetchDataClient<T>(query);
+  }
+
+  return fetchDataClient<T, P>(query, args, context, root);
+}
+```
+
+Reference: `src/lib/client/index.ts:12-26`
+
+### Code Splitting
+
+Note that `fetchDataClient` dynamically imports the GraphQL implementation to reduce the initial bundle size. This is important for performance.
+
+## Axios Configuration
+
+For REST API calls (authentication, playlists, etc.), Axios is configured:
+
+```typescript
+import Axios from "axios";
+import { CLIENT_API_URL } from "@/utils/config";
+
+const axios = Axios.create({
+  baseURL: CLIENT_API_URL,
+  headers: {
+    "X-Requested-With": "XMLHttpRequest",
+  },
+  withCredentials: true,
+  withXSRFToken: true,
+});
+
+export default axios;
+```
+
+Reference: `src/lib/client/axios.ts:6-13`
+
+### Error Handling
+
+```typescript
+export function handleAxiosError(error: AxiosError<{ message?: string }>) {
+  if (error.response) {
+    // AnimeThemes API returned an error
+    return error.response.data.message ?? "Unknown API error.";
+  }
+
+  // Something bad happened before we could reach the API
+  return error.message;
+}
+```
+
+Reference: `src/lib/client/axios.ts:17-25`
+
+## Cache Invalidation
+
+### TanStack Query
+
+Invalidate queries by key:
+
+```tsx
+import { useQueryClient } from "@tanstack/react-query";
+
+const queryClient = useQueryClient();
+
+// Invalidate specific query
+queryClient.invalidateQueries({ queryKey: ["HomePageRecentlyAdded"] });
+
+// Invalidate all queries matching a pattern
+queryClient.invalidateQueries({ queryKey: ["searchGlobal"] });
+```
+
+### SWR
+
+Mutate specific keys:
+
+```tsx
+import { mutate } from "swr";
+
+// Revalidate specific key
+mutate("/api/me");
+
+// Revalidate all keys matching a function
+mutate((key) => typeof key === "string" && key.startsWith("/api"));
+```
+
+## Refetching Strategies
+
+### TanStack Query Options
+
+```tsx
+const { data } = useQuery({
+  queryKey: ["key"],
+  queryFn: fetchData,
+  staleTime: 5000, // Data is fresh for 5 seconds
+  refetchOnWindowFocus: true, // Refetch when window regains focus
+  refetchOnReconnect: true, // Refetch when network reconnects
+});
+```
+
+### SWR Options
+
+```tsx
+const { data } = useSWR("/api/me", fetcher, {
+  fallbackData: { user: null }, // Initial data
+  dedupingInterval: 2000, // Dedupe requests within 2 seconds
+  revalidateOnFocus: true, // Revalidate when window gains focus
+  revalidateOnReconnect: true, // Revalidate when network reconnects
+});
+```
+
+## Best Practices
+
+1. **Use TanStack Query** for most client-side queries (search, lists, etc.)
+2. **Use SWR** for authentication state and data that benefits from automatic revalidation
+3. **Provide placeholder data** to improve perceived performance
+4. **Use keepPreviousData** for search/filter interfaces to prevent UI flicker
+5. **Handle loading and error states** explicitly
+6. **Invalidate queries** after mutations to keep UI in sync
+7. **Use query keys strategically** for granular cache control
+8. **Code-split GraphQL** to reduce initial bundle size
+
+## Real-World Example
+
+Here's a complete example combining all concepts:
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+import gql from "graphql-tag";
+import { fetchDataClient } from "@/lib/client";
+
+export function SearchGlobal({ searchQuery }: SearchGlobalProps) {
+  const fetchSearchResults = () =>
+    fetchDataClient<SearchGlobalQuery, SearchGlobalQueryVariables>(
+      gql`
+        query SearchGlobal($args: SearchArgs!) {
+          search(args: $args) {
+            anime {
+              slug
+              name
+            }
+            themes {
+              id
+              slug
+            }
+          }
+        }
+      `,
+      { args: { query: searchQuery ?? null } },
+    );
+
+  const { data, error, isLoading, isError } = useQuery({
+    queryKey: ["searchGlobal", searchQuery],
+    queryFn: fetchSearchResults,
+    placeholderData: keepPreviousData,
+  });
+
+  if (isError) {
+    return <ErrorCard error={error} />;
+  }
+
+  if (isLoading || !data) {
+    return <Text block>Searching...</Text>;
+  }
+
+  // Render results
+}
+```
+
+Reference: `src/components/search/SearchGlobal.tsx:26-82`
